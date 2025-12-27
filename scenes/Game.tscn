@@ -71,6 +71,10 @@ text = "Discard Selected"
 layout_mode = 2
 text = "Open Shop"
 
+[node name="DeckButton" type="Button" parent="Stats/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "View Deck"
+
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 0
 anchor_right = 1.0
@@ -348,3 +352,38 @@ text = "Sell Selected"
 layout_mode = 2
 text = "Skip"
 size_flags_horizontal = 4
+
+[node name="DeckOverlay" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 16.0
+offset_top = 420.0
+offset_right = 316.0
+offset_bottom = 760.0
+mouse_filter = 1
+z_index = 95
+
+[node name="DeckVBox" type="VBoxContainer" parent="DeckOverlay"]
+layout_mode = 2
+theme_override_constants/separation = 6
+mouse_filter = 1
+
+[node name="DeckTitle" type="Label" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+text = "Draw Pile"
+
+[node name="DeckCountLabel" type="Label" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+text = "Cards: 0"
+
+[node name="DeckScroll" type="ScrollContainer" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 1
+
+[node name="DeckList" type="VBoxContainer" parent="DeckOverlay/DeckVBox/DeckScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+mouse_filter = 1

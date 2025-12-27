@@ -24,6 +24,10 @@ extends Control
 @onready var shop_deck_count_label: Label = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckCountLabel
 @onready var shop_deck_list: VBoxContainer = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckScroll/DeckList
 @onready var shop_sell_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SellButton
+@onready var deck_button: Button = $Stats/VBoxContainer/Buttons/DeckButton
+@onready var deck_overlay: PanelContainer = $DeckOverlay
+@onready var deck_count_label: Label = $DeckOverlay/DeckVBox/DeckCountLabel
+@onready var deck_list: VBoxContainer = $DeckOverlay/DeckVBox/DeckScroll/DeckList
 
 var card_scene: PackedScene = preload("res://scenes/Card.tscn")
 var selected_card: Node = null
@@ -50,7 +54,8 @@ var player_deck: Array[Dictionary] = []
 var player_draw_pile: Array[Dictionary] = []
 var player_discard: Array[Dictionary] = []
 var next_card_id: int = 1
-var starting_deck_size: int = 12
+var starting_deck_size: int = 15
+var enemy_deck_size: int = 18
 var enemy_card_pool: Array[Dictionary] = []
 var enemy_deck: Array[Dictionary] = []
 var enemy_hand: Array[Dictionary] = []
@@ -135,6 +140,8 @@ func _connect_buttons() -> void:
 		shop_reroll_button.pressed.connect(_on_shop_reroll_pressed)
 	if is_instance_valid(shop_sell_button):
 		shop_sell_button.pressed.connect(_on_sell_from_shop_pressed)
+	if is_instance_valid(deck_button):
+		deck_button.pressed.connect(_on_deck_toggle_pressed)
 
 func _on_slot_gui_input(slot: Control, event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -668,11 +675,13 @@ func _remove_card_from_collections(card_id: int) -> void:
 
 
 func _refresh_deck_overlay() -> void:
+	if deck_count_label:
+		deck_count_label.text = "Cards: %d" % player_draw_pile.size()
 	if shop_deck_count_label:
 		shop_deck_count_label.text = "Cards: %d" % player_draw_pile.size()
-	if not shop_deck_list:
+	if not deck_list:
 		return
-	for child in shop_deck_list.get_children():
+	for child in deck_list.get_children():
 		child.queue_free()
 	for card_data in player_draw_pile:
 		if not (card_data is Dictionary):
@@ -683,7 +692,20 @@ func _refresh_deck_overlay() -> void:
 		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
 		var entry := Label.new()
 		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, card_name, atk, hp]
-		shop_deck_list.add_child(entry)
+		deck_list.add_child(entry)
+	if shop_deck_list:
+		for child in shop_deck_list.get_children():
+			child.queue_free()
+		for card_data in player_draw_pile:
+			if not (card_data is Dictionary):
+				continue
+			var card_name2 := str(card_data.get("name", "Card"))
+			var stars2 := int(card_data.get("stars", 1))
+			var atk2 := int(card_data.get("atk", card_data.get("off", 0)))
+			var hp2 := int(card_data.get("hp_max", card_data.get("def", 0)))
+			var entry2 := Label.new()
+			entry2.text = "⭐%d  %s  ATK %d / HP %d" % [stars2, card_name2, atk2, hp2]
+			shop_deck_list.add_child(entry2)
 
 
 func _with_combat_stats(data: Dictionary) -> Dictionary:
@@ -707,6 +729,19 @@ func _clear_shop_offer() -> void:
 	for child in shop_offer_container.get_children():
 		child.queue_free()
 	shop_offer_container.queue_redraw()
+
+
+func _get_weighted_card_data() -> Dictionary:
+	var card_data: Dictionary
+	if card_db and card_db.has_method("get_random_card_weighted"):
+		card_data = card_db.get_random_card_weighted()
+	elif card_db:
+		card_data = card_db.get_random_card()
+	else:
+		card_data = {}
+	if card_data is Dictionary:
+		return _with_combat_stats(card_data)
+	return {}
 
 
 func _is_in_shop_offer(card: Node) -> bool:
@@ -778,11 +813,7 @@ func _generate_shop_offer(clear_first: bool = false) -> void:
 	if shop_offer_container.get_child_count() > 0 and shop_locked:
 		return
 	for i in range(3):
-		var card_data: Dictionary
-		if card_db.has_method("get_random_card_weighted"):
-			card_data = _with_combat_stats(card_db.get_random_card_weighted())
-		else:
-			card_data = _with_combat_stats(card_db.get_random_card())
+		var card_data: Dictionary = _get_weighted_card_data()
 		if card_data.is_empty():
 			continue
 
@@ -1115,25 +1146,15 @@ func _resolve_combat_lane(index: int) -> void:
 
 func _build_enemy_deck() -> void:
 	enemy_card_pool.clear()
-	if card_db and card_db.has_method("get_all_cards"):
-		var all_cards: Array = card_db.get_all_cards()
-		for c in all_cards:
-			if c is Dictionary:
-				enemy_card_pool.append(_with_combat_stats(c))
-
-	if enemy_card_pool.is_empty() and card_db:
-		for i in range(15):
-			var fallback: Dictionary = card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
-			if fallback is Dictionary and not fallback.is_empty():
-				enemy_card_pool.append(_with_combat_stats(fallback))
-
 	enemy_deck.clear()
 	enemy_hand.clear()
-	if enemy_card_pool.is_empty():
+	if card_db == null:
 		return
-	for i in range(2):
-		for c in enemy_card_pool:
-			enemy_deck.append(_with_combat_stats(c))
+	while enemy_deck.size() < enemy_deck_size:
+		var card_data := _get_weighted_card_data()
+		if card_data.is_empty():
+			break
+		enemy_deck.append(card_data.duplicate(true))
 	enemy_deck.shuffle()
 
 
