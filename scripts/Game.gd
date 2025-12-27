@@ -1037,7 +1037,10 @@ func _resolve_combat() -> void:
 func _run_enemy_phase() -> void:
 	enemy_max_energy = min(turn_number, 5)
 	enemy_current_energy = enemy_max_energy
-	_enemy_draw_to_hand(5)
+	var draw_count: int = 1
+	if turn_number == 1 and enemy_hand.is_empty():
+		draw_count = 5
+	_enemy_draw_to_hand(draw_count)
 	_update_enemy_stats()
 
 	while enemy_current_energy > 0:
