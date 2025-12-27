@@ -1,0 +1,174 @@
+{
+  "cards": [
+	{
+	  "id": "gob_base",
+	  "name": "Base Goblin",
+	  "stars": 1,
+	  "rarity": "Common",
+	  "off": 10,
+	  "def": 10,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/base_goblin.png"
+	},
+	{
+	  "id": "gob_birthday_brute",
+	  "name": "Birthday Brute Goblin",
+	  "stars": 2,
+	  "rarity": "Rare",
+	  "off": 26,
+	  "def": 12,
+	  "tags": ["Goblin", "Birthday"],
+	  "sprite": "res://assets/cards/birthdaybrute_goblin.png"
+	},
+	{
+	  "id": "gob_birthday_celebrating",
+	  "name": "Birthday Celebrating Goblin",
+	  "stars": 3,
+	  "rarity": "Rare",
+	  "off": 24,
+	  "def": 13,
+	  "tags": ["Goblin", "Birthday"],
+	  "sprite": "res://assets/cards/birthdaycelebrate_goblin.png"
+	},
+	{
+	  "id": "gob_birthday_director",
+	  "name": "Birthday Director Goblin",
+	  "stars": 5,
+	  "rarity": "Legendary",
+	  "off": 52,
+	  "def": 15,
+	  "tags": ["Goblin", "Birthday", "Director"],
+	  "sprite": "res://assets/cards/birthdaydirector_goblin.png"
+	},
+	{
+	  "id": "gob_birthday_shielder",
+	  "name": "Birthday Shielder Goblin",
+	  "stars": 3,
+	  "rarity": "Rare",
+	  "off": 13,
+	  "def": 36,
+	  "tags": ["Goblin", "Birthday"],
+	  "sprite": "res://assets/cards/birthdayshielder_goblin.png"
+	},
+	{
+	  "id": "gob_bruiser",
+	  "name": "Bruiser Goblin",
+	  "stars": 3,
+	  "rarity": "Rare",
+	  "off": 34,
+	  "def": 11,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/bruiser_goblin.png"
+	},
+	{
+	  "id": "gob_brute",
+	  "name": "Brute Goblin",
+	  "stars": 3,
+	  "rarity": "Rare",
+	  "off": 32,
+	  "def": 13,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/brute_goblin.png"
+	},
+	{
+	  "id": "gob_club",
+	  "name": "Club Goblin",
+	  "stars": 1,
+	  "rarity": "Common",
+	  "off": 12,
+	  "def": 9,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/club_goblin.png"
+	},
+	{
+	  "id": "gob_dual_wielder",
+	  "name": "Dual Wielder Goblin",
+	  "stars": 4,
+	  "rarity": "Epic",
+	  "off": 45,
+	  "def": 16,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/dualwielder_goblin.png"
+	},
+	{
+	  "id": "gob_fire_director",
+	  "name": "Fire Director Goblin",
+	  "stars": 4,
+	  "rarity": "Epic",
+	  "off": 48,
+	  "def": 13,
+	  "tags": ["Goblin", "Fire", "Director"],
+	  "sprite": "res://assets/cards/firedirector_goblin.png"
+	},
+	{
+	  "id": "gob_fire_mage",
+	  "name": "Fire Mage Goblin",
+	  "stars": 5,
+	  "rarity": "Legendary",
+	  "off": 60,
+	  "def": 11,
+	  "tags": ["Goblin", "Fire"],
+	  "sprite": "res://assets/cards/firemage_goblin.png"
+	},
+	{
+	  "id": "gob_on_fire",
+	  "name": "On Fire Goblin",
+	  "stars": 1,
+	  "rarity": "Common",
+	  "off": 14,
+	  "def": 4,
+	  "tags": ["Goblin", "Fire"],
+	  "sprite": "res://assets/cards/fireonfire_goblin.png"
+	},
+	{
+	  "id": "gob_flag",
+	  "name": "Flag Goblin",
+	  "stars": 1,
+	  "rarity": "Common",
+	  "off": 9,
+	  "def": 12,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/flag_goblin.png"
+	},
+	{
+	  "id": "gob_pan",
+	  "name": "Pan Goblin",
+	  "stars": 1,
+	  "rarity": "Common",
+	  "off": 13,
+	  "def": 8,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/pan_goblin.png"
+	},
+	{
+	  "id": "gob_shielder",
+	  "name": "Shielder Goblin",
+	  "stars": 2,
+	  "rarity": "Rare",
+	  "off": 9,
+	  "def": 23,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/shielder_goblin.png"
+	},
+	{
+	  "id": "gob_stabber",
+	  "name": "Stabber Goblin",
+	  "stars": 2,
+	  "rarity": "Rare",
+	  "off": 18,
+	  "def": 10,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/stabber_goblin.png"
+	},
+	{
+	  "id": "gob_tree_wielding",
+	  "name": "Tree Wielding Goblin",
+	  "stars": 5,
+	  "rarity": "Legendary",
+	  "off": 58,
+	  "def": 18,
+	  "tags": ["Goblin"],
+	  "sprite": "res://assets/cards/treewielding_goblin.png"
+	}
+  ]
+}
