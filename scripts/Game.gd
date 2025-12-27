@@ -36,6 +36,7 @@ var discard_gold_claimed: bool = false
 var shop_open: bool = false
 var shop_minimized: bool = false
 var shop_locked: bool = false
+var shop_pending: bool = false
 
 
 func _ready() -> void:
@@ -322,6 +323,7 @@ func _on_end_turn_pressed() -> void:
 	var requirements := get_turn_requirements(turn_number)
 	if _meets_requirements(requirements):
 		turn_number += 1
+		shop_pending = true
 		_open_shop_overlay()
 	else:
 		_show_game_over(requirements)
@@ -355,6 +357,7 @@ func _on_discard_pressed() -> void:
 
 func _start_turn() -> void:
 	_close_shop_overlay(false)
+	shop_pending = false
 	purchases_this_turn = 0
 	discard_gold_claimed = false
 	if turn_number == 1:
@@ -596,6 +599,8 @@ func _price_for_stars(stars: int) -> int:
 
 
 func _open_shop_overlay() -> void:
+	if not shop_pending:
+		return
 	shop_open = true
 	shop_minimized = false
 	# Respect lock: only clear when unlocked and empty
@@ -660,11 +665,15 @@ func _generate_shop_offer(clear_first: bool = false) -> void:
 
 
 func _on_shop_skip_pressed() -> void:
+	if not shop_pending:
+		return
 	_close_shop_overlay(true)
 	_start_turn()
 
 
 func _on_shop_toggle_pressed() -> void:
+	if not shop_pending:
+		return
 	if not shop_open:
 		_open_shop_overlay()
 		return
@@ -681,6 +690,8 @@ func _toggle_shop_visibility() -> void:
 
 
 func _try_buy_card(card: Node) -> void:
+	if not shop_pending:
+		return
 	if purchases_this_turn >= 1:
 		return
 	if card == null or not _is_in_shop_offer(card):
@@ -723,6 +734,7 @@ func _on_shop_reroll_pressed() -> void:
 func _update_shop_toggle_label() -> void:
 	if not shop_toggle_button:
 		return
+	shop_toggle_button.disabled = not shop_pending
 	if shop_open:
 		shop_toggle_button.text = "Hide Shop" if shop_overlay.visible else "Show Shop"
 	else:
