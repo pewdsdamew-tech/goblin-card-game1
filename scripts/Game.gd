@@ -3,10 +3,11 @@ extends Control
 @onready var card_db: Node = $CardDatabase
 @onready var hand_panel: Container = $BottomUI/UIStack/HandPanel
 @onready var active_slots: HBoxContainer = $BottomUI/UIStack/ActiveSlots
+@onready var enemy_slots: HBoxContainer = $BottomUI/UIStack/EnemySlots
 @onready var stats_label: Label = $Stats/VBoxContainer/StatsLabel
+@onready var enemy_stats_label: Label = $Stats/VBoxContainer/EnemyStatsLabel
 @onready var turn_label: Label = $Stats/VBoxContainer/TurnLabel
 @onready var energy_label: Label = $Stats/VBoxContainer/EnergyLabel
-@onready var opponent_label: RichTextLabel = $Stats/VBoxContainer/OpponentLabel
 @onready var gold_label: Label = $Stats/VBoxContainer/GoldLabel
 @onready var end_turn_button: Button = $Stats/VBoxContainer/Buttons/EndTurnButton
 @onready var discard_button: Button = $Stats/VBoxContainer/Buttons/DiscardButton
@@ -29,7 +30,9 @@ var max_energy: int = 1
 var current_energy: int = 1
 var current_total_off: int = 0
 var current_total_def: int = 0
-var current_archetype: Dictionary = {}
+var enemy_total_off: int = 0
+var enemy_total_def: int = 0
+var enemy_total_stars: int = 0
 var gold: int = 3
 var purchases_this_turn: int = 0
 var discard_gold_claimed: bool = false
@@ -37,6 +40,11 @@ var shop_open: bool = false
 var shop_minimized: bool = false
 var shop_locked: bool = false
 var shop_pending: bool = false
+var enemy_card_pool: Array[Dictionary] = []
+var enemy_deck: Array[Dictionary] = []
+var enemy_hand: Array[Dictionary] = []
+var enemy_max_energy: int = 1
+var enemy_current_energy: int = 1
 
 
 func _ready() -> void:
@@ -44,10 +52,10 @@ func _ready() -> void:
 	_connect_slot_clicks()
 	_connect_buttons()
 	_hide_game_over()
+	_build_enemy_deck()
 	_start_turn()
 	_populate_hand()
 	_update_active_stats()
-	_update_requirement_ui()
 	_update_gold_ui()
 	_close_shop_overlay(true)
 
@@ -277,7 +285,6 @@ func _update_active_stats() -> void:
 				total_stars += int(data.get("stars", 0))
 
 	stats_label.text = "OFF: %d   DEF: %d   STARS: %d" % [current_total_off, current_total_def, total_stars]
-	_update_requirement_ui()
 
 func _update_energy_ui() -> void:
 	turn_label.text = "Turn %d" % turn_number
@@ -294,6 +301,27 @@ func _reset_energy_for_turn() -> void:
 	max_energy = min(5, turn_number)
 	current_energy = max_energy
 	_update_energy_ui()
+
+
+func _update_enemy_stats() -> void:
+	enemy_total_off = 0
+	enemy_total_def = 0
+	enemy_total_stars = 0
+
+	for slot in enemy_slots.get_children():
+		if not (slot is Control):
+			continue
+		var content: Node = slot.get_node_or_null("Content")
+		if content and content.get_child_count() > 0:
+			var card := content.get_child(0)
+			if card is Node and ("card_data" in card):
+				var data: Dictionary = card.card_data
+				enemy_total_off += int(data.get("off", 0))
+				enemy_total_def += int(data.get("def", 0))
+				enemy_total_stars += int(data.get("stars", 0))
+
+	if enemy_stats_label:
+		enemy_stats_label.text = "Enemy OFF: %d   DEF: %d   STARS: %d" % [enemy_total_off, enemy_total_def, enemy_total_stars]
 
 
 func _refill_hand_to_max() -> void:
@@ -320,13 +348,14 @@ func _refill_hand_to_max() -> void:
 func _on_end_turn_pressed() -> void:
 	_unselect_current()
 	_update_active_stats()
-	var requirements := get_turn_requirements(turn_number)
-	if _meets_requirements(requirements):
+	_enemy_take_turn()
+	_update_enemy_stats()
+	if _player_wins_against_enemy():
 		turn_number += 1
 		shop_pending = true
 		_open_shop_overlay()
 	else:
-		_show_game_over(requirements)
+		_show_game_over()
 
 
 func _on_discard_pressed() -> void:
@@ -366,83 +395,13 @@ func _start_turn() -> void:
 		var income_bonus: int = int(gold / 5.0)
 		gold = gold + 2 + income_bonus
 	_reset_energy_for_turn()
-	_roll_archetype()
+	_enemy_prepare_turn()
 	if not shop_locked:
 		_generate_shop_offer(true)
 	_update_active_stats()
-	_update_requirement_ui()
+	_update_enemy_stats()
 	_update_gold_ui()
 	_update_shop_buttons()
-
-
-func get_turn_requirements(turn: int) -> Dictionary:
-	var base_energy: int = min(5, turn)
-	var base_min_off: int = base_energy * 4
-	var base_min_def: int = base_energy * 3
-	var base_score: int = base_energy * 8
-
-	var archetype: Dictionary = current_archetype if not current_archetype.is_empty() else _balanced_archetype()
-	var req_off_mult: float = float(archetype.get("req_off_mult", 1.0))
-	var req_def_mult: float = float(archetype.get("req_def_mult", 1.0))
-	var score_mult: float = float(archetype.get("score_mult", 1.0))
-	var off_count_mult: float = float(archetype.get("off_count_mult", 1.0))
-	var def_count_mult: float = float(archetype.get("def_count_mult", 1.0))
-
-	var min_off: int = int(round(base_min_off * req_off_mult))
-	var min_def: int = int(round(base_min_def * req_def_mult))
-	var score_target: int = int(round(base_score * score_mult))
-
-	return {
-		"min_off": min_off,
-		"min_def": min_def,
-		"score_target": score_target,
-		"archetype": archetype,
-		"off_count_mult": off_count_mult,
-		"def_count_mult": def_count_mult,
-	}
-
-
-func _meets_requirements(req: Dictionary) -> bool:
-	var off_mult := float(req.get("off_count_mult", 1.0))
-	var def_mult := float(req.get("def_count_mult", 1.0))
-	var adjusted_off := current_total_off * off_mult
-	var adjusted_def := current_total_def * def_mult
-
-	var min_gate := adjusted_off >= float(req.get("min_off", 0)) or adjusted_def >= float(req.get("min_def", 0))
-	var score_gate := (adjusted_off + adjusted_def) >= float(req.get("score_target", 0))
-	return min_gate and score_gate
-
-
-func _update_requirement_ui() -> void:
-	var req := get_turn_requirements(turn_number)
-	var off_mult := float(req.get("off_count_mult", 1.0))
-	var def_mult := float(req.get("def_count_mult", 1.0))
-	var adjusted_off := current_total_off * off_mult
-	var adjusted_def := current_total_def * def_mult
-	var min_gate := adjusted_off >= float(req.get("min_off", 0)) or adjusted_def >= float(req.get("min_def", 0))
-	var score_gate := (adjusted_off + adjusted_def) >= float(req.get("score_target", 0))
-	var meets := min_gate and score_gate
-
-	var status_text := "[color=green]✓[/color]" if meets else "[color=red]✗[/color]"
-	var min_status := "[color=green]✓[/color]" if min_gate else "[color=red]✗[/color]"
-	var score_status := "[color=green]✓[/color]" if score_gate else "[color=red]✗[/color]"
-	var archetype: Dictionary = req.get("archetype", _balanced_archetype())
-	var archetype_name := String(archetype.get("name", "Balanced"))
-
-	if opponent_label:
-		opponent_label.bbcode_enabled = true
-		opponent_label.bbcode_text = "Archetype: [b]%s[/b] %s\nMin: OFF %d or DEF %d %s\nScore: %.1f / %d %s\nTotals: OFF %.1f, DEF %.1f" % [
-			archetype_name,
-			status_text,
-			req.get("min_off", 0),
-			req.get("min_def", 0),
-			min_status,
-			adjusted_off + adjusted_def,
-			req.get("score_target", 0),
-			score_status,
-			adjusted_off,
-			adjusted_def,
-		]
 
 
 func _show_insufficient_energy_feedback(card: Node) -> void:
@@ -463,11 +422,11 @@ func _show_insufficient_energy_feedback(card: Node) -> void:
 		tween_color.tween_property(energy_label, "modulate", original_color, 0.1)
 
 
-func _show_game_over(requirements: Dictionary) -> void:
+func _show_game_over() -> void:
 	if game_over_label:
-		game_over_label.text = "Game Over\nNeeded OFF %d / DEF %d\nYou had OFF %d / DEF %d" % [
-			requirements.get("min_off", 0),
-			requirements.get("min_def", 0),
+		game_over_label.text = "Game Over\nEnemy OFF %d / DEF %d\nYou had OFF %d / DEF %d" % [
+			enemy_total_off,
+			enemy_total_def,
 			current_total_off,
 			current_total_def,
 		]
@@ -487,10 +446,11 @@ func _reset_game() -> void:
 	selected_card = null
 	_clear_all_cards()
 	turn_number = 1
+	_build_enemy_deck()
 	_start_turn()
 	_populate_hand()
 	_update_active_stats()
-	_close_shop_overlay()
+	_close_shop_overlay(true)
 
 
 func _clear_all_cards() -> void:
@@ -501,66 +461,18 @@ func _clear_all_cards() -> void:
 		if content:
 			for child in content.get_children():
 				child.queue_free()
+	for slot in enemy_slots.get_children():
+		if not (slot is Control):
+			continue
+		var content2: Node = slot.get_node_or_null("Content")
+		if content2:
+			for child in content2.get_children():
+				child.queue_free()
+	enemy_hand.clear()
+	enemy_deck.clear()
 	for child in hand_panel.get_children():
 		child.queue_free()
 	_clear_shop_offer()
-
-
-func _roll_archetype() -> void:
-	var pool := _get_archetypes()
-	if pool.is_empty():
-		current_archetype = _balanced_archetype()
-		return
-	current_archetype = pool[randi() % pool.size()]
-
-
-func _balanced_archetype() -> Dictionary:
-	return {
-		"name": "Balanced",
-		"req_off_mult": 1.0,
-		"req_def_mult": 1.0,
-		"score_mult": 1.0,
-		"off_count_mult": 1.0,
-		"def_count_mult": 1.0,
-	}
-
-
-func _get_archetypes() -> Array:
-	return [
-		_balanced_archetype(),
-		{
-			"name": "Fortress",
-			"req_off_mult": 0.9,
-			"req_def_mult": 1.25,
-			"score_mult": 1.075,
-			"off_count_mult": 1.0,
-			"def_count_mult": 1.0,
-		},
-		{
-			"name": "Blitz",
-			"req_off_mult": 1.25,
-			"req_def_mult": 0.9,
-			"score_mult": 1.075,
-			"off_count_mult": 1.0,
-			"def_count_mult": 1.0,
-		},
-		{
-			"name": "Anti-Off",
-			"req_off_mult": 1.0,
-			"req_def_mult": 1.0,
-			"score_mult": 1.0,
-			"off_count_mult": 0.9,
-			"def_count_mult": 1.1,
-		},
-		{
-			"name": "Anti-Def",
-			"req_off_mult": 1.0,
-			"req_def_mult": 1.0,
-			"score_mult": 1.0,
-			"off_count_mult": 1.1,
-			"def_count_mult": 0.9,
-		},
-	]
 
 
 func _clear_shop_offer() -> void:
@@ -770,3 +682,126 @@ func _get_star_cap() -> int:
 	if turn_number <= 4:
 		return 6
 	return 8
+
+
+func _player_wins_against_enemy() -> bool:
+	return current_total_off >= enemy_total_def and current_total_def >= enemy_total_off
+
+
+func _build_enemy_deck() -> void:
+	enemy_card_pool.clear()
+	if card_db and card_db.has_method("get_all_cards"):
+		var all_cards: Array = card_db.get_all_cards()
+		for c in all_cards:
+			if c is Dictionary:
+				enemy_card_pool.append(c.duplicate(true))
+
+	if enemy_card_pool.is_empty() and card_db:
+		for i in range(15):
+			var fallback := card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
+			if fallback is Dictionary and not fallback.is_empty():
+				enemy_card_pool.append(fallback.duplicate(true))
+
+	enemy_deck.clear()
+	enemy_hand.clear()
+	if enemy_card_pool.is_empty():
+		return
+	for i in range(2):
+		for c in enemy_card_pool:
+			enemy_deck.append(c.duplicate(true))
+	enemy_deck.shuffle()
+
+
+func _ensure_enemy_deck() -> void:
+	if enemy_deck.is_empty() and not enemy_card_pool.is_empty():
+		for c in enemy_card_pool:
+			enemy_deck.append(c.duplicate(true))
+		enemy_deck.shuffle()
+
+
+func _enemy_draw_to_hand(target_size: int) -> void:
+	while enemy_hand.size() < target_size:
+		_ensure_enemy_deck()
+		if enemy_deck.is_empty():
+			break
+		enemy_hand.append(enemy_deck.pop_back())
+
+
+func _enemy_prepare_turn() -> void:
+	enemy_max_energy = min(turn_number, 5)
+	enemy_current_energy = enemy_max_energy
+	_enemy_draw_to_hand(5)
+	_update_enemy_stats()
+
+
+func _get_leftmost_empty_enemy_slot() -> Control:
+	for slot in enemy_slots.get_children():
+		if not (slot is Control):
+			continue
+		var content: Node = slot.get_node_or_null("Content")
+		if content and content.get_child_count() == 0:
+			return slot as Control
+	return null
+
+
+func _enemy_take_turn() -> void:
+	enemy_max_energy = min(turn_number, 5)
+	enemy_current_energy = enemy_max_energy
+	_enemy_draw_to_hand(5)
+	_update_enemy_stats()
+
+	while enemy_current_energy > 0:
+		var target_slot := _get_leftmost_empty_enemy_slot()
+		if target_slot == null:
+			break
+
+		var playable_indices: Array = []
+		for i in range(enemy_hand.size()):
+			var card_data: Dictionary = enemy_hand[i]
+			if int(card_data.get("stars", 1)) <= enemy_current_energy:
+				playable_indices.append(i)
+		if playable_indices.is_empty():
+			break
+
+		var totals := {
+			"off": enemy_total_off,
+			"def": enemy_total_def,
+		}
+		var need_off := max(0, (current_total_def + 1) - totals["off"])
+		var need_def := max(0, (current_total_off + 1) - totals["def"])
+
+		var best_score := -INF
+		var best_index := -1
+		for idx in playable_indices:
+			var cdata: Dictionary = enemy_hand[idx]
+			var off_val := float(cdata.get("off", 0))
+			var def_val := float(cdata.get("def", 0))
+			var stars := float(cdata.get("stars", 1))
+			var off_weight := 1.25 if need_off > need_def else 1.0
+			var def_weight := 1.25 if need_def >= need_off else 1.0
+			var score := (off_val * off_weight) + (def_val * def_weight) - (stars * 0.2)
+			if score > best_score:
+				best_score = score
+				best_index = idx
+
+		if best_index == -1:
+			break
+
+		var chosen := enemy_hand[best_index]
+		enemy_hand.remove_at(best_index)
+		enemy_current_energy -= int(chosen.get("stars", 1))
+		_place_enemy_card(target_slot, chosen)
+		_update_enemy_stats()
+
+
+func _place_enemy_card(slot: Control, card_data: Dictionary) -> void:
+	if not slot or not slot.has_node("Content"):
+		return
+	var content: Node = slot.get_node("Content")
+	if content.get_child_count() > 0:
+		return
+	var card_instance = card_scene.instantiate()
+	content.add_child(card_instance)
+	if card_instance.has_method("set_card_data"):
+		card_instance.set_card_data(card_data)
+	_reset_card_transform(card_instance)

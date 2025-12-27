@@ -43,14 +43,9 @@ text = "OFF: 0   DEF: 0   STARS: 0"
 layout_mode = 2
 text = "Gold: 3"
 
-[node name="OpponentLabel" type="RichTextLabel" parent="Stats/VBoxContainer"]
+[node name="EnemyStatsLabel" type="Label" parent="Stats/VBoxContainer"]
 layout_mode = 2
-focus_mode = 0
-mouse_filter = 2
-selection_enabled = false
-bbcode_enabled = true
-text = "Opponent: OFF 12 / DEF 10 ✗"
-fit_content = true
+text = "Enemy OFF: 0   DEF: 0   STARS: 0"
 
 [node name="Buttons" type="HBoxContainer" parent="Stats/VBoxContainer"]
 layout_mode = 2
@@ -99,6 +94,48 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="EnemySlots" type="HBoxContainer" parent="BottomUI/UIStack"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="EnemySlot1" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot1"]
+layout_mode = 2
+
+[node name="EnemySlot2" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot2"]
+layout_mode = 2
+
+[node name="EnemySlot3" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot3"]
+layout_mode = 2
+
+[node name="EnemySlot4" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot4"]
+layout_mode = 2
+
+[node name="EnemySlot5" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot5"]
+layout_mode = 2
 
 [node name="ActiveSlots" type="HBoxContainer" parent="BottomUI/UIStack"]
 custom_minimum_size = Vector2(0, 240)
