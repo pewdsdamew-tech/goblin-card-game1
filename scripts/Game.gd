@@ -713,6 +713,7 @@ func _try_buy_card(card: Node) -> void:
 	_update_gold_ui()
 	_update_active_stats()
 	_close_shop_overlay(true)
+	shop_locked = false
 	_start_turn()
 
 
