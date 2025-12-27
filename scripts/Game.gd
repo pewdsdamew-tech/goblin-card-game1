@@ -40,6 +40,8 @@ var shop_open: bool = false
 var shop_minimized: bool = false
 var shop_locked: bool = false
 var shop_pending: bool = false
+var player_hp: int = 100
+var enemy_hp: int = 100
 var enemy_card_pool: Array[Dictionary] = []
 var enemy_deck: Array[Dictionary] = []
 var enemy_hand: Array[Dictionary] = []
@@ -69,9 +71,9 @@ func _populate_hand() -> void:
 	for i in range(5):
 		var card_data: Dictionary
 		if card_db.has_method("get_random_card_weighted"):
-			card_data = card_db.get_random_card_weighted()
+			card_data = _with_combat_stats(card_db.get_random_card_weighted())
 		else:
-			card_data = card_db.get_random_card()
+			card_data = _with_combat_stats(card_db.get_random_card())
 
 		if card_data.is_empty():
 			return
@@ -295,12 +297,14 @@ func _update_energy_ui() -> void:
 func _update_gold_ui() -> void:
 	if gold_label:
 		gold_label.text = "Gold: %d" % gold
+	_update_hp_ui()
 
 
 func _reset_energy_for_turn() -> void:
 	max_energy = min(5, turn_number)
 	current_energy = max_energy
 	_update_energy_ui()
+	_update_hp_ui()
 
 
 func _update_enemy_stats() -> void:
@@ -324,13 +328,22 @@ func _update_enemy_stats() -> void:
 		enemy_stats_label.text = "Enemy OFF: %d   DEF: %d   STARS: %d" % [enemy_total_off, enemy_total_def, enemy_total_stars]
 
 
+func _update_hp_ui() -> void:
+	if has_node("Stats/VBoxContainer/PlayerHpLabel"):
+		var lbl: Label = get_node("Stats/VBoxContainer/PlayerHpLabel")
+		lbl.text = "HP: %d" % player_hp
+	if has_node("Stats/VBoxContainer/EnemyHpLabel"):
+		var lbl2: Label = get_node("Stats/VBoxContainer/EnemyHpLabel")
+		lbl2.text = "Enemy HP: %d" % enemy_hp
+
+
 func _refill_hand_to_max() -> void:
 	while hand_panel.get_child_count() < 5:
 		var card_data: Dictionary
 		if card_db.has_method("get_random_card_weighted"):
-			card_data = card_db.get_random_card_weighted()
+			card_data = _with_combat_stats(card_db.get_random_card_weighted())
 		else:
-			card_data = card_db.get_random_card()
+			card_data = _with_combat_stats(card_db.get_random_card())
 
 		if card_data.is_empty():
 			return
@@ -350,12 +363,21 @@ func _on_end_turn_pressed() -> void:
 	_update_active_stats()
 	_enemy_take_turn()
 	_update_enemy_stats()
-	if _player_wins_against_enemy():
-		turn_number += 1
-		shop_pending = true
-		_open_shop_overlay()
-	else:
-		_show_game_over()
+	_resolve_combat()
+	_update_active_stats()
+	_update_enemy_stats()
+	_update_hp_ui()
+
+	if player_hp <= 0:
+		_show_game_over(false)
+		return
+	if enemy_hp <= 0:
+		_show_game_over(true)
+		return
+
+	turn_number += 1
+	shop_pending = true
+	_open_shop_overlay()
 
 
 func _on_discard_pressed() -> void:
@@ -390,6 +412,9 @@ func _start_turn() -> void:
 	purchases_this_turn = 0
 	discard_gold_claimed = false
 	if turn_number == 1:
+		player_hp = 100
+		enemy_hp = 100
+	if turn_number == 1:
 		gold = 3
 	else:
 		var income_bonus: int = int(gold / 5.0)
@@ -400,6 +425,7 @@ func _start_turn() -> void:
 		_generate_shop_offer(true)
 	_update_active_stats()
 	_update_enemy_stats()
+	_update_hp_ui()
 	_update_gold_ui()
 	_update_shop_buttons()
 
@@ -422,14 +448,18 @@ func _show_insufficient_energy_feedback(card: Node) -> void:
 		tween_color.tween_property(energy_label, "modulate", original_color, 0.1)
 
 
-func _show_game_over() -> void:
+func _show_game_over(victory: bool) -> void:
 	if game_over_label:
-		game_over_label.text = "Game Over\nEnemy OFF %d / DEF %d\nYou had OFF %d / DEF %d\nWin rule: Your OFF >= Enemy DEF AND Your DEF >= Enemy OFF" % [
-			enemy_total_off,
-			enemy_total_def,
-			current_total_off,
-			current_total_def,
-		]
+		if victory:
+			game_over_label.text = "Victory!\nEnemy HP %d\nYour HP %d" % [
+				enemy_hp,
+				player_hp,
+			]
+		else:
+			game_over_label.text = "Game Over\nEnemy HP %d\nYour HP %d" % [
+				enemy_hp,
+				player_hp,
+			]
 	if game_over_layer:
 		game_over_layer.visible = true
 		if game_over_layer.has_method("grab_focus"):
@@ -473,6 +503,21 @@ func _clear_all_cards() -> void:
 	for child in hand_panel.get_children():
 		child.queue_free()
 	_clear_shop_offer()
+
+
+func _with_combat_stats(data: Dictionary) -> Dictionary:
+	var d := data.duplicate(true)
+	var atk := int(d.get("off", 0))
+	var hp_max := int(d.get("def", 0))
+	if hp_max <= 0:
+		hp_max = 1
+	d["atk"] = atk
+	d["hp_max"] = hp_max
+	if not d.has("hp"):
+		d["hp"] = hp_max
+	else:
+		d["hp"] = int(d.get("hp", hp_max))
+	return d
 
 
 func _clear_shop_offer() -> void:
@@ -548,9 +593,9 @@ func _generate_shop_offer(clear_first: bool = false) -> void:
 	for i in range(3):
 		var card_data: Dictionary
 		if card_db.has_method("get_random_card_weighted"):
-			card_data = card_db.get_random_card_weighted()
+			card_data = _with_combat_stats(card_db.get_random_card_weighted())
 		else:
-			card_data = card_db.get_random_card()
+			card_data = _with_combat_stats(card_db.get_random_card())
 		if card_data.is_empty():
 			continue
 
@@ -684,8 +729,64 @@ func _get_star_cap() -> int:
 	return 8
 
 
-func _player_wins_against_enemy() -> bool:
-	return current_total_off >= enemy_total_def and current_total_def >= enemy_total_off
+func _get_lane_card(container: HBoxContainer, index: int) -> Node:
+	if index >= container.get_child_count():
+		return null
+	var slot := container.get_child(index)
+	if not (slot is Control):
+		return null
+	var content: Node = slot.get_node_or_null("Content")
+	if content and content.get_child_count() > 0:
+		return content.get_child(0)
+	return null
+
+
+func _apply_damage_to_card(card: Node, damage: int) -> void:
+	if card == null or damage <= 0:
+		return
+	if not ("card_data" in card):
+		return
+	var current_hp := int(card.card_data.get("hp", card.card_data.get("hp_max", 0)))
+	current_hp -= damage
+	card.card_data["hp"] = current_hp
+	if card.has_method("update_hp"):
+		card.update_hp(current_hp)
+	if current_hp <= 0:
+		card.queue_free()
+
+
+func _resolve_combat() -> void:
+	var lane_count := min(active_slots.get_child_count(), enemy_slots.get_child_count())
+	var player_damages: Array[int] = []
+	var enemy_damages: Array[int] = []
+	for i in range(lane_count):
+		var p_card := _get_lane_card(active_slots, i)
+		var e_card := _get_lane_card(enemy_slots, i)
+
+		if p_card != null and e_card != null:
+			player_damages.append(int(e_card.card_data.get("atk", 0)))
+			enemy_damages.append(int(p_card.card_data.get("atk", 0)))
+		elif p_card != null:
+			enemy_hp -= int(p_card.card_data.get("atk", 0))
+			enemy_hp = max(enemy_hp, 0)
+			player_damages.append(0)
+			enemy_damages.append(0)
+		elif e_card != null:
+			player_hp -= int(e_card.card_data.get("atk", 0))
+			player_hp = max(player_hp, 0)
+			player_damages.append(0)
+			enemy_damages.append(0)
+		else:
+			player_damages.append(0)
+			enemy_damages.append(0)
+
+	for i in range(lane_count):
+		var p_card := _get_lane_card(active_slots, i)
+		var e_card := _get_lane_card(enemy_slots, i)
+		if p_card != null and enemy_damages[i] > 0:
+			_apply_damage_to_card(p_card, enemy_damages[i])
+		if e_card != null and player_damages[i] > 0:
+			_apply_damage_to_card(e_card, player_damages[i])
 
 
 func _build_enemy_deck() -> void:
@@ -694,13 +795,13 @@ func _build_enemy_deck() -> void:
 		var all_cards: Array = card_db.get_all_cards()
 		for c in all_cards:
 			if c is Dictionary:
-				enemy_card_pool.append(c.duplicate(true))
+				enemy_card_pool.append(_with_combat_stats(c))
 
-		if enemy_card_pool.is_empty() and card_db:
-			for i in range(15):
-				var fallback: Dictionary = card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
-				if fallback is Dictionary and not fallback.is_empty():
-					enemy_card_pool.append(fallback.duplicate(true))
+	if enemy_card_pool.is_empty() and card_db:
+		for i in range(15):
+			var fallback: Dictionary = card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
+			if fallback is Dictionary and not fallback.is_empty():
+				enemy_card_pool.append(_with_combat_stats(fallback))
 
 	enemy_deck.clear()
 	enemy_hand.clear()
@@ -708,7 +809,7 @@ func _build_enemy_deck() -> void:
 		return
 	for i in range(2):
 		for c in enemy_card_pool:
-			enemy_deck.append(c.duplicate(true))
+			enemy_deck.append(_with_combat_stats(c))
 	enemy_deck.shuffle()
 
 

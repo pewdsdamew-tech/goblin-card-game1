@@ -1,6 +1,7 @@
 extends Control
 
 @onready var art: TextureRect = $Art
+@onready var hp_label: Label = $HpLabel
 
 var card_data: Dictionary = {}
 
@@ -24,7 +25,7 @@ func _ready() -> void:
 
 
 func set_card_data(d: Dictionary) -> void:
-	card_data = d
+	card_data = d.duplicate(true)
 
 	var sprite_path: String = card_data.get("sprite", "")
 	if sprite_path != "":
@@ -35,6 +36,17 @@ func set_card_data(d: Dictionary) -> void:
 			art.texture = null
 	else:
 		art.texture = null
+
+	var hp_val := int(card_data.get("hp", card_data.get("hp_max", 0)))
+	var hp_max := int(card_data.get("hp_max", hp_val))
+	card_data["hp_max"] = hp_max
+	card_data["hp"] = hp_val
+	_update_hp_label()
+
+
+func update_hp(hp_val: int) -> void:
+	card_data["hp"] = hp_val
+	_update_hp_label()
 
 
 func set_selected(v: bool) -> void:
@@ -76,3 +88,9 @@ func _animate_scale(target: Vector2) -> void:
 		tween.kill()
 	tween = create_tween()
 	tween.tween_property(self, "scale", target, 0.08)
+
+
+func _update_hp_label() -> void:
+	if hp_label:
+		var hp_val := int(card_data.get("hp", 0))
+		hp_label.text = "HP: %d" % hp_val

@@ -39,6 +39,14 @@ text = "Energy: 1 / 1"
 layout_mode = 2
 text = "OFF: 0   DEF: 0   STARS: 0"
 
+[node name="PlayerHpLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "HP: 100"
+
+[node name="EnemyHpLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Enemy HP: 100"
+
 [node name="GoldLabel" type="Label" parent="Stats/VBoxContainer"]
 layout_mode = 2
 text = "Gold: 3"
