@@ -47,6 +47,8 @@ var enemy_deck: Array[Dictionary] = []
 var enemy_hand: Array[Dictionary] = []
 var enemy_max_energy: int = 1
 var enemy_current_energy: int = 1
+enum Phase { SHOP, PLAYER, ENEMY, COMBAT, GAME_OVER }
+var phase: Phase = Phase.PLAYER
 
 
 func _ready() -> void:
@@ -55,6 +57,7 @@ func _ready() -> void:
 	_connect_buttons()
 	_hide_game_over()
 	_build_enemy_deck()
+	phase = Phase.PLAYER
 	_start_turn()
 	_populate_hand()
 	_update_active_stats()
@@ -93,6 +96,9 @@ func _populate_hand() -> void:
 func _on_card_clicked(card) -> void:
 	if _is_in_shop_offer(card):
 		_try_buy_card(card)
+		return
+
+	if phase != Phase.PLAYER or shop_open or shop_pending:
 		return
 
 	# Toggle off if clicking the same card
@@ -159,6 +165,8 @@ func _on_slot_gui_input(slot: Control, event: InputEvent) -> void:
 
 
 func _try_place_selected_into_slot(slot: Control) -> void:
+	if phase != Phase.PLAYER or shop_pending or shop_open:
+		return
 	if selected_card == null:
 		return
 	if _is_in_shop_offer(selected_card):
@@ -292,6 +300,7 @@ func _update_energy_ui() -> void:
 	turn_label.text = "Turn %d" % turn_number
 	energy_label.text = "Energy: %d / %d" % [current_energy, max_energy]
 	_update_gold_ui()
+	_update_hp_ui()
 
 
 func _update_gold_ui() -> void:
@@ -359,28 +368,21 @@ func _refill_hand_to_max() -> void:
 
 
 func _on_end_turn_pressed() -> void:
+	if phase != Phase.PLAYER:
+		return
+	phase = Phase.ENEMY
+	_set_controls_enabled(false)
 	_unselect_current()
 	_update_active_stats()
-	_enemy_take_turn()
-	_update_enemy_stats()
-	_resolve_combat()
-	_update_active_stats()
-	_update_enemy_stats()
-	_update_hp_ui()
-
-	if player_hp <= 0:
-		_show_game_over(false)
-		return
-	if enemy_hp <= 0:
-		_show_game_over(true)
-		return
-
-	turn_number += 1
-	shop_pending = true
-	_open_shop_overlay()
+	await _run_enemy_phase()
+	phase = Phase.COMBAT
+	await _run_combat_phase()
+	_set_controls_enabled(true)
 
 
 func _on_discard_pressed() -> void:
+	if phase != Phase.PLAYER:
+		return
 	if selected_card == null:
 		return
 
@@ -428,6 +430,8 @@ func _start_turn() -> void:
 	_update_hp_ui()
 	_update_gold_ui()
 	_update_shop_buttons()
+	phase = Phase.PLAYER
+	_set_controls_enabled(true)
 
 
 func _show_insufficient_energy_feedback(card: Node) -> void:
@@ -449,6 +453,7 @@ func _show_insufficient_energy_feedback(card: Node) -> void:
 
 
 func _show_game_over(victory: bool) -> void:
+	_set_controls_enabled(false)
 	if game_over_label:
 		if victory:
 			game_over_label.text = "Victory!\nEnemy HP %d\nYour HP %d" % [
@@ -560,6 +565,7 @@ func _open_shop_overlay() -> void:
 		return
 	shop_open = true
 	shop_minimized = false
+	_set_controls_enabled(false)
 	# Respect lock: only clear when unlocked and empty
 	if not shop_locked and shop_offer_container.get_child_count() == 0:
 		_clear_shop_offer()
@@ -625,6 +631,7 @@ func _on_shop_skip_pressed() -> void:
 	if not shop_pending:
 		return
 	_close_shop_overlay(true)
+	phase = Phase.PLAYER
 	_start_turn()
 
 
@@ -671,6 +678,7 @@ func _try_buy_card(card: Node) -> void:
 	_update_active_stats()
 	_close_shop_overlay(true)
 	shop_locked = false
+	phase = Phase.PLAYER
 	_start_turn()
 
 
@@ -729,6 +737,15 @@ func _get_star_cap() -> int:
 	return 8
 
 
+func _set_controls_enabled(enabled: bool) -> void:
+	if end_turn_button:
+		end_turn_button.disabled = not enabled
+	if discard_button:
+		discard_button.disabled = not enabled
+	if shop_toggle_button:
+		shop_toggle_button.disabled = not enabled or not shop_pending
+
+
 func _get_lane_card(container: HBoxContainer, index: int) -> Node:
 	if index >= container.get_child_count():
 		return null
@@ -756,37 +773,117 @@ func _apply_damage_to_card(card: Node, damage: int) -> void:
 
 
 func _resolve_combat() -> void:
+	pass # handled in animated phase
+
+
+func _run_enemy_phase() -> void:
+	enemy_max_energy = min(turn_number, 5)
+	enemy_current_energy = enemy_max_energy
+	_enemy_draw_to_hand(5)
+	_update_enemy_stats()
+
+	while enemy_current_energy > 0:
+		var target_slot := _get_leftmost_empty_enemy_slot()
+		if target_slot == null:
+			break
+
+		var playable_indices: Array = []
+		for i in range(enemy_hand.size()):
+			var card_data: Dictionary = enemy_hand[i]
+			if int(card_data.get("stars", 1)) <= enemy_current_energy:
+				playable_indices.append(i)
+		if playable_indices.is_empty():
+			break
+
+		var totals_off: int = enemy_total_off
+		var totals_def: int = enemy_total_def
+		var need_off: int = max(0, (current_total_def + 1) - totals_off)
+		var need_def: int = max(0, (current_total_off + 1) - totals_def)
+
+		var best_score := -INF
+		var best_index := -1
+		for idx in playable_indices:
+			var cdata: Dictionary = enemy_hand[idx]
+			var off_val := float(cdata.get("off", 0))
+			var def_val := float(cdata.get("def", 0))
+			var stars := float(cdata.get("stars", 1))
+			var off_weight := 1.25 if need_off > need_def else 1.0
+			var def_weight := 1.25 if need_def >= need_off else 1.0
+			var score := (off_val * off_weight) + (def_val * def_weight) - (stars * 0.2)
+			if score > best_score:
+				best_score = score
+				best_index = idx
+
+		if best_index == -1:
+			break
+
+		var chosen := enemy_hand[best_index]
+		enemy_hand.remove_at(best_index)
+		enemy_current_energy -= int(chosen.get("stars", 1))
+		var placed := _place_enemy_card(target_slot, chosen)
+		if placed and placed is Control:
+			var tw := create_tween()
+			tw.tween_property(placed, "scale", Vector2(1.05, 1.05), 0.1)
+			tw.tween_property(placed, "scale", Vector2.ONE, 0.08)
+		_update_enemy_stats()
+		await get_tree().create_timer(0.12).timeout
+
+
+func _run_combat_phase() -> void:
 	var lane_count: int = min(active_slots.get_child_count(), enemy_slots.get_child_count())
-	var player_damages: Array[int] = []
-	var enemy_damages: Array[int] = []
 	for i in range(lane_count):
-		var p_card := _get_lane_card(active_slots, i)
-		var e_card := _get_lane_card(enemy_slots, i)
+		await _resolve_combat_lane(i)
+	_update_active_stats()
+	_update_enemy_stats()
+	_update_hp_ui()
 
-		if p_card != null and e_card != null:
-			player_damages.append(int(e_card.card_data.get("atk", 0)))
-			enemy_damages.append(int(p_card.card_data.get("atk", 0)))
-		elif p_card != null:
-			enemy_hp -= int(p_card.card_data.get("atk", 0))
-			enemy_hp = max(enemy_hp, 0)
-			player_damages.append(0)
-			enemy_damages.append(0)
-		elif e_card != null:
-			player_hp -= int(e_card.card_data.get("atk", 0))
-			player_hp = max(player_hp, 0)
-			player_damages.append(0)
-			enemy_damages.append(0)
-		else:
-			player_damages.append(0)
-			enemy_damages.append(0)
+	if player_hp <= 0:
+		phase = Phase.GAME_OVER
+		_show_game_over(false)
+		return
+	if enemy_hp <= 0:
+		phase = Phase.GAME_OVER
+		_show_game_over(true)
+		return
 
-	for i in range(lane_count):
-		var p_card := _get_lane_card(active_slots, i)
-		var e_card := _get_lane_card(enemy_slots, i)
-		if p_card != null and enemy_damages[i] > 0:
-			_apply_damage_to_card(p_card, enemy_damages[i])
-		if e_card != null and player_damages[i] > 0:
-			_apply_damage_to_card(e_card, player_damages[i])
+	turn_number += 1
+	shop_pending = true
+	phase = Phase.SHOP
+	_open_shop_overlay()
+
+
+func _resolve_combat_lane(index: int) -> void:
+	var p_card := _get_lane_card(active_slots, index)
+	var e_card := _get_lane_card(enemy_slots, index)
+
+	var p_atk := p_card.card_data.get("atk", 0) if p_card and ("card_data" in p_card) else 0
+	var e_atk := e_card.card_data.get("atk", 0) if e_card and ("card_data" in e_card) else 0
+
+	var p_orig := p_card.position if p_card else Vector2.ZERO
+	var e_orig := e_card.position if e_card else Vector2.ZERO
+
+	var tween := create_tween()
+	if p_card:
+		tween.tween_property(p_card, "position", p_orig + Vector2(0, -20), 0.15).set_ease(Tween.EASE_OUT)
+	if e_card:
+		tween.parallel().tween_property(e_card, "position", e_orig + Vector2(0, 20), 0.15).set_ease(Tween.EASE_OUT)
+	await tween.finished
+
+	# Apply damage
+	if p_card and e_card:
+		_apply_damage_to_card(p_card, e_atk)
+		_apply_damage_to_card(e_card, p_atk)
+	elif p_card and not e_card:
+		enemy_hp = max(0, enemy_hp - int(p_atk))
+	elif e_card and not p_card:
+		player_hp = max(0, player_hp - int(e_atk))
+
+	var tween_back := create_tween()
+	if p_card and is_instance_valid(p_card):
+		tween_back.tween_property(p_card, "position", p_orig, 0.12).set_ease(Tween.EASE_OUT)
+	if e_card and is_instance_valid(e_card):
+		tween_back.parallel().tween_property(e_card, "position", e_orig, 0.12).set_ease(Tween.EASE_OUT)
+	await tween_back.finished
 
 
 func _build_enemy_deck() -> void:
@@ -893,14 +990,15 @@ func _enemy_take_turn() -> void:
 		_update_enemy_stats()
 
 
-func _place_enemy_card(slot: Control, card_data: Dictionary) -> void:
+func _place_enemy_card(slot: Control, card_data: Dictionary) -> Node:
 	if not slot or not slot.has_node("Content"):
-		return
+		return null
 	var content: Node = slot.get_node("Content")
 	if content.get_child_count() > 0:
-		return
+		return null
 	var card_instance = card_scene.instantiate()
 	content.add_child(card_instance)
 	if card_instance.has_method("set_card_data"):
 		card_instance.set_card_data(card_data)
 	_reset_card_transform(card_instance)
+	return card_instance
