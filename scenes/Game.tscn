@@ -15,6 +15,42 @@ script = ExtResource("1")
 [node name="CardDatabase" type="Node" parent="."]
 script = ExtResource("2")
 
+[node name="Stats" type="MarginContainer" parent="."]
+layout_mode = 0
+anchors_preset = 1
+offset_left = 12.0
+offset_top = 12.0
+mouse_filter = 0
+z_index = 100
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Stats"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TurnLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Turn 1"
+
+[node name="EnergyLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Energy: 1 / 1"
+
+[node name="StatsLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "OFF: 0   DEF: 0   STARS: 0"
+
+[node name="Buttons" type="HBoxContainer" parent="Stats/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EndTurnButton" type="Button" parent="Stats/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "End Turn"
+
+[node name="DiscardButton" type="Button" parent="Stats/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "Discard Selected"
+
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 0
 anchor_right = 1.0
@@ -48,7 +84,9 @@ grow_vertical = 2
 [node name="ActiveSlots" type="HBoxContainer" parent="BottomUI/UIStack"]
 custom_minimum_size = Vector2(0, 240)
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 20
+alignment = 1
 
 [node name="Slot1" type="PanelContainer" parent="BottomUI/UIStack/ActiveSlots"]
 custom_minimum_size = Vector2(160, 210)
