@@ -856,11 +856,11 @@ func _resolve_combat_lane(index: int) -> void:
 	var p_card := _get_lane_card(active_slots, index)
 	var e_card := _get_lane_card(enemy_slots, index)
 
-	var p_atk := p_card.card_data.get("atk", 0) if p_card and ("card_data" in p_card) else 0
-	var e_atk := e_card.card_data.get("atk", 0) if e_card and ("card_data" in e_card) else 0
+	var p_atk: int = p_card.card_data.get("atk", 0) if p_card and ("card_data" in p_card) else 0
+	var e_atk: int = e_card.card_data.get("atk", 0) if e_card and ("card_data" in e_card) else 0
 
-	var p_orig := p_card.position if p_card else Vector2.ZERO
-	var e_orig := e_card.position if e_card else Vector2.ZERO
+	var p_orig: Vector2 = p_card.position if p_card else Vector2.ZERO
+	var e_orig: Vector2 = e_card.position if e_card else Vector2.ZERO
 
 	var tween := create_tween()
 	if p_card:
