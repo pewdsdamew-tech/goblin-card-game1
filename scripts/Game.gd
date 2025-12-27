@@ -763,13 +763,13 @@ func _enemy_take_turn() -> void:
 		if playable_indices.is_empty():
 			break
 
-			var totals_off: int = enemy_total_off
-			var totals_def: int = enemy_total_def
-			var need_off: int = max(0, (current_total_def + 1) - totals_off)
-			var need_def: int = max(0, (current_total_off + 1) - totals_def)
+		var totals_off: int = enemy_total_off
+		var totals_def: int = enemy_total_def
+		var need_off: int = max(0, (current_total_def + 1) - totals_off)
+		var need_def: int = max(0, (current_total_off + 1) - totals_def)
 
-			var best_score := -INF
-			var best_index := -1
+		var best_score := -INF
+		var best_index := -1
 		for idx in playable_indices:
 			var cdata: Dictionary = enemy_hand[idx]
 			var off_val := float(cdata.get("off", 0))
