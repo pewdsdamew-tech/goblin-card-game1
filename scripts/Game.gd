@@ -708,6 +708,13 @@ func _refresh_deck_overlay() -> void:
 			shop_deck_list.add_child(entry2)
 
 
+func _on_deck_toggle_pressed() -> void:
+	if not deck_overlay:
+		return
+	deck_overlay.visible = not deck_overlay.visible
+	_refresh_deck_overlay()
+
+
 func _with_combat_stats(data: Dictionary) -> Dictionary:
 	var d := data.duplicate(true)
 	var atk := int(d.get("off", 0))
