@@ -822,17 +822,18 @@ func _run_enemy_phase() -> void:
 		enemy_current_energy -= int(chosen.get("stars", 1))
 		var placed := _place_enemy_card(target_slot, chosen)
 		if placed and placed is Control:
-			var tw := create_tween()
-			tw.tween_property(placed, "scale", Vector2(1.05, 1.05), 0.1)
-			tw.tween_property(placed, "scale", Vector2.ONE, 0.08)
+			var tw: Tween = create_tween()
+			tw.tween_property(placed, "scale", Vector2(1.05, 1.05), 0.15)
+			tw.tween_property(placed, "scale", Vector2.ONE, 0.12)
 		_update_enemy_stats()
-		await get_tree().create_timer(0.12).timeout
+		await get_tree().create_timer(0.2).timeout
 
 
 func _run_combat_phase() -> void:
 	var lane_count: int = min(active_slots.get_child_count(), enemy_slots.get_child_count())
 	for i in range(lane_count):
 		await _resolve_combat_lane(i)
+		await get_tree().create_timer(0.12).timeout
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
@@ -862,12 +863,14 @@ func _resolve_combat_lane(index: int) -> void:
 	var p_orig: Vector2 = p_card.position if p_card else Vector2.ZERO
 	var e_orig: Vector2 = e_card.position if e_card else Vector2.ZERO
 
-	var tween := create_tween()
-	if p_card:
-		tween.tween_property(p_card, "position", p_orig + Vector2(0, -20), 0.15).set_ease(Tween.EASE_OUT)
-	if e_card:
-		tween.parallel().tween_property(e_card, "position", e_orig + Vector2(0, 20), 0.15).set_ease(Tween.EASE_OUT)
-	await tween.finished
+	var tween: Tween = null
+	if p_card or e_card:
+		tween = create_tween()
+		if p_card:
+			tween.tween_property(p_card, "position", p_orig + Vector2(0, -24), 0.2).set_ease(Tween.EASE_OUT)
+		if e_card:
+			tween.parallel().tween_property(e_card, "position", e_orig + Vector2(0, 24), 0.2).set_ease(Tween.EASE_OUT)
+		await tween.finished
 
 	# Apply damage
 	if p_card and e_card:
@@ -878,12 +881,16 @@ func _resolve_combat_lane(index: int) -> void:
 	elif e_card and not p_card:
 		player_hp = max(0, player_hp - int(e_atk))
 
-	var tween_back := create_tween()
-	if p_card and is_instance_valid(p_card):
-		tween_back.tween_property(p_card, "position", p_orig, 0.12).set_ease(Tween.EASE_OUT)
-	if e_card and is_instance_valid(e_card):
-		tween_back.parallel().tween_property(e_card, "position", e_orig, 0.12).set_ease(Tween.EASE_OUT)
-	await tween_back.finished
+	var tween_back: Tween = null
+	if (p_card and is_instance_valid(p_card)) or (e_card and is_instance_valid(e_card)):
+		tween_back = create_tween()
+		if p_card and is_instance_valid(p_card):
+			tween_back.tween_property(p_card, "position", p_orig, 0.18).set_ease(Tween.EASE_OUT)
+		if e_card and is_instance_valid(e_card):
+			tween_back.parallel().tween_property(e_card, "position", e_orig, 0.18).set_ease(Tween.EASE_OUT)
+		await tween_back.finished
+
+	await get_tree().create_timer(0.08).timeout
 
 
 func _build_enemy_deck() -> void:
