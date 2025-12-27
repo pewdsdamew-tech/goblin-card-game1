@@ -21,6 +21,10 @@ extends Control
 @onready var shop_skip_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SkipButton
 @onready var shop_lock_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopLockButton
 @onready var shop_reroll_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopRerollButton
+@onready var deck_button: Button = $DeckButton
+@onready var deck_overlay: PanelContainer = $DeckOverlay
+@onready var deck_count_label: Label = $DeckOverlay/VBoxContainer/DeckCountLabel
+@onready var deck_list: VBoxContainer = $DeckOverlay/VBoxContainer/DeckScroll/DeckList
 
 var card_scene: PackedScene = preload("res://scenes/Card.tscn")
 var selected_card: Node = null
@@ -47,6 +51,7 @@ var player_deck: Array[Dictionary] = []
 var player_draw_pile: Array[Dictionary] = []
 var player_discard: Array[Dictionary] = []
 var next_card_id: int = 1
+var starting_deck_size: int = 12
 var enemy_card_pool: Array[Dictionary] = []
 var enemy_deck: Array[Dictionary] = []
 var enemy_hand: Array[Dictionary] = []
@@ -129,6 +134,8 @@ func _connect_buttons() -> void:
 		shop_lock_button.pressed.connect(_on_shop_lock_pressed)
 	if is_instance_valid(shop_reroll_button):
 		shop_reroll_button.pressed.connect(_on_shop_reroll_pressed)
+	if is_instance_valid(deck_button):
+		deck_button.pressed.connect(_on_deck_toggle_pressed)
 
 func _on_slot_gui_input(slot: Control, event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -412,6 +419,8 @@ func _sell_selected_card() -> void:
 	selected_card = null
 	_update_gold_ui()
 	_update_shop_buttons()
+	_update_deck_button_label()
+	_refresh_deck_overlay()
 	_update_active_stats()
 
 
@@ -451,12 +460,15 @@ func _start_player_turn(is_new_fight: bool) -> void:
 	else:
 		var income_bonus: int = int(gold / 5.0)
 		gold = gold + 2 + income_bonus
+	if not is_new_fight:
+		_draw_up_to_hand(5)
 	_reset_energy_for_turn()
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
 	_update_gold_ui()
 	_update_shop_buttons()
+	_update_deck_button_label()
 	_update_shop_toggle_label()
 	phase = Phase.PLAYER
 	_set_controls_enabled(true)
@@ -523,6 +535,8 @@ func _start_run() -> void:
 	_close_shop_overlay(true)
 	_build_player_deck()
 	_prepare_fight()
+	_update_deck_button_label()
+	_refresh_deck_overlay()
 
 
 func _build_player_deck() -> void:
@@ -531,13 +545,15 @@ func _build_player_deck() -> void:
 	player_discard.clear()
 	next_card_id = 1
 	if card_db and card_db.has_method("get_random_card_weighted"):
-		for i in range(10):
+		for i in range(starting_deck_size):
 			var data := _normalize_card_for_deck(card_db.get_random_card_weighted())
 			player_deck.append(data)
 	elif card_db:
-		for i in range(10):
+		for i in range(starting_deck_size):
 			var data2 := _normalize_card_for_deck(card_db.get_random_card())
 			player_deck.append(data2)
+	_update_deck_button_label()
+	_refresh_deck_overlay()
 
 
 func _normalize_card_for_deck(data: Dictionary) -> Dictionary:
@@ -601,6 +617,8 @@ func _prepare_fight() -> void:
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
+	_update_deck_button_label()
+	_refresh_deck_overlay()
 	phase = Phase.PLAYER
 	_start_player_turn(true)
 
@@ -642,6 +660,12 @@ func _spawn_card_to_hand(card_data: Dictionary) -> void:
 		card_instance.clicked.connect(_on_card_clicked)
 
 
+func _draw_up_to_hand(max_size: int) -> void:
+	while hand_panel.get_child_count() < max_size and not player_draw_pile.is_empty():
+		var card_data: Dictionary = player_draw_pile.pop_back()
+		_spawn_card_to_hand(card_data)
+
+
 func _populate_shop_hand_snapshot() -> void:
 	for child in hand_panel.get_children():
 		child.queue_free()
@@ -668,6 +692,39 @@ func _remove_card_from_collections(card_id: int) -> void:
 			if int(arr[i].get("id", -1)) == card_id:
 				arr.remove_at(i)
 				break
+
+
+func _update_deck_button_label() -> void:
+	if deck_button:
+		deck_button.text = "Deck (%d)" % player_deck.size()
+
+
+func _refresh_deck_overlay() -> void:
+	if not deck_overlay:
+		return
+	if deck_count_label:
+		deck_count_label.text = "Cards: %d" % player_deck.size()
+	if not deck_list:
+		return
+	for child in deck_list.get_children():
+		child.queue_free()
+	for card_data in player_deck:
+		if not (card_data is Dictionary):
+			continue
+		var name := str(card_data.get("name", "Card"))
+		var stars := int(card_data.get("stars", 1))
+		var atk := int(card_data.get("atk", card_data.get("off", 0)))
+		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
+		var entry := Label.new()
+		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, name, atk, hp]
+		deck_list.add_child(entry)
+
+
+func _on_deck_toggle_pressed() -> void:
+	if not deck_overlay:
+		return
+	deck_overlay.visible = not deck_overlay.visible
+	_refresh_deck_overlay()
 
 
 func _with_combat_stats(data: Dictionary) -> Dictionary:
@@ -835,6 +892,8 @@ func _try_buy_card(card: Node) -> void:
 		player_deck.append(_normalize_card_for_deck(data))
 	_update_gold_ui()
 	_update_shop_buttons()
+	_update_deck_button_label()
+	_refresh_deck_overlay()
 	_populate_shop_hand_snapshot()
 	card.queue_free()
 
