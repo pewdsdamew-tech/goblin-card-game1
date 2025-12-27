@@ -21,10 +21,9 @@ extends Control
 @onready var shop_skip_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SkipButton
 @onready var shop_lock_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopLockButton
 @onready var shop_reroll_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopRerollButton
-@onready var deck_button: Button = $DeckButton
-@onready var deck_overlay: PanelContainer = $DeckOverlay
-@onready var deck_count_label: Label = $DeckOverlay/VBoxContainer/DeckCountLabel
-@onready var deck_list: VBoxContainer = $DeckOverlay/VBoxContainer/DeckScroll/DeckList
+@onready var shop_deck_count_label: Label = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckCountLabel
+@onready var shop_deck_list: VBoxContainer = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckScroll/DeckList
+@onready var shop_sell_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SellButton
 
 var card_scene: PackedScene = preload("res://scenes/Card.tscn")
 var selected_card: Node = null
@@ -134,8 +133,8 @@ func _connect_buttons() -> void:
 		shop_lock_button.pressed.connect(_on_shop_lock_pressed)
 	if is_instance_valid(shop_reroll_button):
 		shop_reroll_button.pressed.connect(_on_shop_reroll_pressed)
-	if is_instance_valid(deck_button):
-		deck_button.pressed.connect(_on_deck_toggle_pressed)
+	if is_instance_valid(shop_sell_button):
+		shop_sell_button.pressed.connect(_on_sell_from_shop_pressed)
 
 func _on_slot_gui_input(slot: Control, event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -419,7 +418,6 @@ func _sell_selected_card() -> void:
 	selected_card = null
 	_update_gold_ui()
 	_update_shop_buttons()
-	_update_deck_button_label()
 	_refresh_deck_overlay()
 	_update_active_stats()
 
@@ -460,16 +458,16 @@ func _start_player_turn(is_new_fight: bool) -> void:
 	else:
 		var income_bonus: int = int(gold / 5.0)
 		gold = gold + 2 + income_bonus
-	if not is_new_fight:
-		_draw_up_to_hand(5)
+	if not is_new_fight and hand_panel.get_child_count() < 5 and not player_draw_pile.is_empty():
+		_draw_cards_to_hand(1)
 	_reset_energy_for_turn()
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
 	_update_gold_ui()
 	_update_shop_buttons()
-	_update_deck_button_label()
 	_update_shop_toggle_label()
+	_refresh_deck_overlay()
 	phase = Phase.PLAYER
 	_set_controls_enabled(true)
 
@@ -535,7 +533,6 @@ func _start_run() -> void:
 	_close_shop_overlay(true)
 	_build_player_deck()
 	_prepare_fight()
-	_update_deck_button_label()
 	_refresh_deck_overlay()
 
 
@@ -552,7 +549,6 @@ func _build_player_deck() -> void:
 		for i in range(starting_deck_size):
 			var data2 := _normalize_card_for_deck(card_db.get_random_card())
 			player_deck.append(data2)
-	_update_deck_button_label()
 	_refresh_deck_overlay()
 
 
@@ -617,7 +613,6 @@ func _prepare_fight() -> void:
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
-	_update_deck_button_label()
 	_refresh_deck_overlay()
 	phase = Phase.PLAYER
 	_start_player_turn(true)
@@ -660,28 +655,6 @@ func _spawn_card_to_hand(card_data: Dictionary) -> void:
 		card_instance.clicked.connect(_on_card_clicked)
 
 
-func _draw_up_to_hand(max_size: int) -> void:
-	while hand_panel.get_child_count() < max_size and not player_draw_pile.is_empty():
-		var card_data: Dictionary = player_draw_pile.pop_back()
-		_spawn_card_to_hand(card_data)
-
-
-func _populate_shop_hand_snapshot() -> void:
-	for child in hand_panel.get_children():
-		child.queue_free()
-	var limit: int = player_deck.size()
-	for i in range(limit):
-		var deck_card: Dictionary = player_deck[i]
-		if not (deck_card is Dictionary):
-			continue
-		var copy: Dictionary = deck_card.duplicate(true)
-		copy["hp"] = int(copy.get("hp_max", copy.get("def", 1)))
-		var card_instance = card_scene.instantiate()
-		hand_panel.add_child(card_instance)
-		if card_instance.has_method("set_card_data"):
-			card_instance.set_card_data(copy)
-		if card_instance.has_signal("clicked"):
-			card_instance.clicked.connect(_on_card_clicked)
 
 
 func _remove_card_from_collections(card_id: int) -> void:
@@ -694,21 +667,14 @@ func _remove_card_from_collections(card_id: int) -> void:
 				break
 
 
-func _update_deck_button_label() -> void:
-	if deck_button:
-		deck_button.text = "Deck (%d)" % player_deck.size()
-
-
 func _refresh_deck_overlay() -> void:
-	if not deck_overlay:
+	if shop_deck_count_label:
+		shop_deck_count_label.text = "Cards: %d" % player_draw_pile.size()
+	if not shop_deck_list:
 		return
-	if deck_count_label:
-		deck_count_label.text = "Cards: %d" % player_deck.size()
-	if not deck_list:
-		return
-	for child in deck_list.get_children():
+	for child in shop_deck_list.get_children():
 		child.queue_free()
-	for card_data in player_deck:
+	for card_data in player_draw_pile:
 		if not (card_data is Dictionary):
 			continue
 		var name := str(card_data.get("name", "Card"))
@@ -717,14 +683,7 @@ func _refresh_deck_overlay() -> void:
 		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
 		var entry := Label.new()
 		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, name, atk, hp]
-		deck_list.add_child(entry)
-
-
-func _on_deck_toggle_pressed() -> void:
-	if not deck_overlay:
-		return
-	deck_overlay.visible = not deck_overlay.visible
-	_refresh_deck_overlay()
+		shop_deck_list.add_child(entry)
 
 
 func _with_combat_stats(data: Dictionary) -> Dictionary:
@@ -786,7 +745,6 @@ func _open_shop_overlay() -> void:
 	_set_controls_enabled(false)
 	if discard_button:
 		discard_button.disabled = false
-	_populate_shop_hand_snapshot()
 	# Respect lock: only clear when unlocked and empty
 	if not shop_locked and shop_offer_container.get_child_count() == 0:
 		_clear_shop_offer()
@@ -798,6 +756,7 @@ func _open_shop_overlay() -> void:
 	if shop_offer_container.get_child_count() == 0:
 		_generate_shop_offer()
 	_update_gold_ui()
+	_refresh_deck_overlay()
 	_update_shop_toggle_label()
 
 
@@ -892,9 +851,7 @@ func _try_buy_card(card: Node) -> void:
 		player_deck.append(_normalize_card_for_deck(data))
 	_update_gold_ui()
 	_update_shop_buttons()
-	_update_deck_button_label()
 	_refresh_deck_overlay()
-	_populate_shop_hand_snapshot()
 	card.queue_free()
 
 
@@ -932,8 +889,14 @@ func _update_shop_buttons() -> void:
 		shop_lock_button.text = "Unlock Shop" if shop_locked else "Lock Shop"
 	if shop_reroll_button:
 		var can_reroll := gold >= 1
-		shop_reroll_button.disabled = not can_reroll
-		shop_reroll_button.text = "Reroll (-1 gold)"
+	shop_reroll_button.disabled = not can_reroll
+	shop_reroll_button.text = "Reroll (-1 gold)"
+
+
+func _on_sell_from_shop_pressed() -> void:
+	if not shop_pending:
+		return
+	_sell_selected_card()
 
 
 func _advance_to_next_fight() -> void:

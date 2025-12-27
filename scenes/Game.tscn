@@ -15,45 +15,6 @@ script = ExtResource("1")
 [node name="CardDatabase" type="Node" parent="."]
 script = ExtResource("2")
 
-[node name="DeckButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 16.0
-offset_top = 660.0
-text = "Deck (0)"
-
-[node name="DeckOverlay" type="PanelContainer" parent="."]
-visible = false
-layout_mode = 0
-offset_left = 16.0
-offset_top = 400.0
-offset_right = 276.0
-offset_bottom = 750.0
-mouse_filter = 1
-
-[node name="VBoxContainer" type="VBoxContainer" parent="DeckOverlay"]
-layout_mode = 2
-theme_override_constants/separation = 6
-mouse_filter = 1
-
-[node name="DeckTitle" type="Label" parent="DeckOverlay/VBoxContainer"]
-layout_mode = 2
-text = "Deck"
-
-[node name="DeckCountLabel" type="Label" parent="DeckOverlay/VBoxContainer"]
-layout_mode = 2
-text = "Cards: 0"
-
-[node name="DeckScroll" type="ScrollContainer" parent="DeckOverlay/VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
-mouse_filter = 1
-
-[node name="DeckList" type="VBoxContainer" parent="DeckOverlay/VBoxContainer/DeckScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-mouse_filter = 1
-
 [node name="Stats" type="MarginContainer" parent="."]
 layout_mode = 0
 anchors_preset = 1
@@ -338,6 +299,34 @@ layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 12
 
+[node name="DeckPanel" type="VBoxContainer" parent="ShopOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="DeckHeader" type="HBoxContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="DeckTitle" type="Label" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckHeader"]
+layout_mode = 2
+text = "Your Deck (draw pile)"
+
+[node name="DeckCountLabel" type="Label" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckHeader"]
+layout_mode = 2
+text = "Cards: 0"
+
+[node name="DeckScroll" type="ScrollContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DeckList" type="VBoxContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
 [node name="ShopButtons" type="HBoxContainer" parent="ShopOverlay/Panel/VBoxContainer"]
 layout_mode = 2
 alignment = 1
@@ -350,6 +339,10 @@ text = "Lock Shop"
 [node name="ShopRerollButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
 layout_mode = 2
 text = "Reroll (-1 gold)"
+
+[node name="SellButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
+layout_mode = 2
+text = "Sell Selected"
 
 [node name="SkipButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
 layout_mode = 2
