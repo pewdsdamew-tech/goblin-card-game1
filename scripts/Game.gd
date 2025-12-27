@@ -424,7 +424,7 @@ func _show_insufficient_energy_feedback(card: Node) -> void:
 
 func _show_game_over() -> void:
 	if game_over_label:
-		game_over_label.text = "Game Over\nEnemy OFF %d / DEF %d\nYou had OFF %d / DEF %d" % [
+		game_over_label.text = "Game Over\nEnemy OFF %d / DEF %d\nYou had OFF %d / DEF %d\nWin rule: Your OFF >= Enemy DEF AND Your DEF >= Enemy OFF" % [
 			enemy_total_off,
 			enemy_total_def,
 			current_total_off,
