@@ -756,7 +756,7 @@ func _apply_damage_to_card(card: Node, damage: int) -> void:
 
 
 func _resolve_combat() -> void:
-	var lane_count := min(active_slots.get_child_count(), enemy_slots.get_child_count())
+	var lane_count: int = min(active_slots.get_child_count(), enemy_slots.get_child_count())
 	var player_damages: Array[int] = []
 	var enemy_damages: Array[int] = []
 	for i in range(lane_count):
