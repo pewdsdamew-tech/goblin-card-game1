@@ -17,7 +17,7 @@ extends Control
 @onready var shop_overlay: Control = $ShopOverlay
 @onready var shop_offer_container: HBoxContainer = $ShopOverlay/Panel/VBoxContainer/Offers
 @onready var shop_instruction_label: Label = $ShopOverlay/Panel/VBoxContainer/InstructionLabel
-@onready var shop_skip_button: Button = $ShopOverlay/Panel/VBoxContainer/SkipButton
+@onready var shop_skip_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SkipButton
 @onready var shop_lock_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopLockButton
 @onready var shop_reroll_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopRerollButton
 
