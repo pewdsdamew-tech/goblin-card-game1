@@ -696,11 +696,11 @@ func _build_enemy_deck() -> void:
 			if c is Dictionary:
 				enemy_card_pool.append(c.duplicate(true))
 
-	if enemy_card_pool.is_empty() and card_db:
-		for i in range(15):
-			var fallback := card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
-			if fallback is Dictionary and not fallback.is_empty():
-				enemy_card_pool.append(fallback.duplicate(true))
+		if enemy_card_pool.is_empty() and card_db:
+			for i in range(15):
+				var fallback: Dictionary = card_db.get_random_card_weighted() if card_db.has_method("get_random_card_weighted") else card_db.get_random_card()
+				if fallback is Dictionary and not fallback.is_empty():
+					enemy_card_pool.append(fallback.duplicate(true))
 
 	enemy_deck.clear()
 	enemy_hand.clear()
@@ -763,12 +763,10 @@ func _enemy_take_turn() -> void:
 		if playable_indices.is_empty():
 			break
 
-		var totals := {
-			"off": enemy_total_off,
-			"def": enemy_total_def,
-		}
-		var need_off := max(0, (current_total_def + 1) - totals["off"])
-		var need_def := max(0, (current_total_off + 1) - totals["def"])
+			var totals_off: int = enemy_total_off
+			var totals_def: int = enemy_total_def
+			var need_off := max(0, (current_total_def + 1) - totals_off)
+			var need_def := max(0, (current_total_off + 1) - totals_def)
 
 		var best_score := -INF
 		var best_index := -1
