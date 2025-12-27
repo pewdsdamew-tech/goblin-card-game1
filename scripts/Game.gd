@@ -677,12 +677,12 @@ func _refresh_deck_overlay() -> void:
 	for card_data in player_draw_pile:
 		if not (card_data is Dictionary):
 			continue
-		var name := str(card_data.get("name", "Card"))
+		var card_name := str(card_data.get("name", "Card"))
 		var stars := int(card_data.get("stars", 1))
 		var atk := int(card_data.get("atk", card_data.get("off", 0)))
 		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
 		var entry := Label.new()
-		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, name, atk, hp]
+		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, card_name, atk, hp]
 		shop_deck_list.add_child(entry)
 
 
@@ -888,9 +888,9 @@ func _update_shop_buttons() -> void:
 	if shop_lock_button:
 		shop_lock_button.text = "Unlock Shop" if shop_locked else "Lock Shop"
 	if shop_reroll_button:
-		var can_reroll := gold >= 1
-	shop_reroll_button.disabled = not can_reroll
-	shop_reroll_button.text = "Reroll (-1 gold)"
+		var can_reroll: bool = gold >= 1
+		shop_reroll_button.disabled = not can_reroll
+		shop_reroll_button.text = "Reroll (-1 gold)"
 
 
 func _on_sell_from_shop_pressed() -> void:
