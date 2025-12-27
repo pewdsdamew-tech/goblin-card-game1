@@ -34,7 +34,6 @@ var enemy_total_off: int = 0
 var enemy_total_def: int = 0
 var enemy_total_stars: int = 0
 var gold: int = 3
-var purchases_this_turn: int = 0
 var discard_gold_claimed: bool = false
 var shop_open: bool = false
 var shop_minimized: bool = false
@@ -42,6 +41,12 @@ var shop_locked: bool = false
 var shop_pending: bool = false
 var player_hp: int = 100
 var enemy_hp: int = 100
+var current_fight_index: int = 1
+var max_fights: int = 5
+var player_deck: Array[Dictionary] = []
+var player_draw_pile: Array[Dictionary] = []
+var player_discard: Array[Dictionary] = []
+var next_card_id: int = 1
 var enemy_card_pool: Array[Dictionary] = []
 var enemy_deck: Array[Dictionary] = []
 var enemy_hand: Array[Dictionary] = []
@@ -56,41 +61,7 @@ func _ready() -> void:
 	_connect_slot_clicks()
 	_connect_buttons()
 	_hide_game_over()
-	_build_enemy_deck()
-	phase = Phase.PLAYER
-	_start_turn()
-	_populate_hand()
-	_update_active_stats()
-	_update_gold_ui()
-	_close_shop_overlay(true)
-
-
-func _populate_hand() -> void:
-	# Clear existing hand cards
-	for child in hand_panel.get_children():
-		child.queue_free()
-
-	# Draw 5 cards
-	for i in range(5):
-		var card_data: Dictionary
-		if card_db.has_method("get_random_card_weighted"):
-			card_data = _with_combat_stats(card_db.get_random_card_weighted())
-		else:
-			card_data = _with_combat_stats(card_db.get_random_card())
-
-		if card_data.is_empty():
-			return
-
-		var card_instance = card_scene.instantiate()
-		hand_panel.add_child(card_instance) # IMPORTANT: add first so @onready vars exist
-
-		# Set visuals/data
-		if card_instance.has_method("set_card_data"):
-			card_instance.set_card_data(card_data)
-
-		# Listen for click-to-select
-		if card_instance.has_signal("clicked"):
-			card_instance.clicked.connect(_on_card_clicked)
+	_start_run()
 
 
 func _on_card_clicked(card) -> void:
@@ -98,7 +69,7 @@ func _on_card_clicked(card) -> void:
 		_try_buy_card(card)
 		return
 
-	if phase != Phase.PLAYER or shop_open or shop_pending:
+	if phase != Phase.PLAYER and phase != Phase.SHOP:
 		return
 
 	# Toggle off if clicking the same card
@@ -277,6 +248,15 @@ func _find_slot_for_card(card: Node) -> Control:
 func _is_in_active_slots(card: Node) -> bool:
 	return _find_slot_for_card(card) != null
 
+
+func _is_enemy_card_node(card: Node) -> bool:
+	var current := card.get_parent()
+	while current:
+		if current.get_parent() == enemy_slots:
+			return true
+		current = current.get_parent()
+	return false
+
 func _update_active_stats() -> void:
 	current_total_off = 0
 	current_total_def = 0
@@ -297,7 +277,7 @@ func _update_active_stats() -> void:
 	stats_label.text = "OFF: %d   DEF: %d   STARS: %d" % [current_total_off, current_total_def, total_stars]
 
 func _update_energy_ui() -> void:
-	turn_label.text = "Turn %d" % turn_number
+	turn_label.text = "Fight %d/%d  Turn %d" % [current_fight_index, max_fights, turn_number]
 	energy_label.text = "Energy: %d / %d" % [current_energy, max_energy]
 	_update_gold_ui()
 	_update_hp_ui()
@@ -377,13 +357,16 @@ func _on_end_turn_pressed() -> void:
 	await _run_enemy_phase()
 	phase = Phase.COMBAT
 	await _run_combat_phase()
-	_set_controls_enabled(true)
+	_set_controls_enabled(phase == Phase.PLAYER)
 
 
 func _on_discard_pressed() -> void:
-	if phase != Phase.PLAYER:
-		return
 	if selected_card == null:
+		return
+	if phase == Phase.SHOP and shop_pending:
+		_sell_selected_card()
+		return
+	if phase != Phase.PLAYER:
 		return
 
 	if _is_in_shop_offer(selected_card):
@@ -393,12 +376,16 @@ func _on_discard_pressed() -> void:
 		var parent := selected_card.get_parent()
 		if parent:
 			parent.remove_child(selected_card)
+		if "card_data" in selected_card:
+			_send_card_data_to_discard(selected_card.card_data)
 		selected_card.queue_free()
 		selected_card = null
 		_update_active_stats()
 		return
 
 	if selected_card.get_parent() == hand_panel:
+		if "card_data" in selected_card:
+			_send_card_data_to_discard(selected_card.card_data)
 		selected_card.queue_free()
 		selected_card = null
 		if not discard_gold_claimed:
@@ -408,28 +395,69 @@ func _on_discard_pressed() -> void:
 		_update_active_stats()
 
 
-func _start_turn() -> void:
+func _sell_selected_card() -> void:
+	if selected_card == null:
+		return
+	if selected_card.get_parent() != hand_panel:
+		return
+	if _is_in_shop_offer(selected_card):
+		return
+	var data: Dictionary = selected_card.card_data if "card_data" in selected_card else {}
+	var stars: int = int(data.get("stars", 1))
+	var value: int = max(0, _price_for_stars(stars) - 1)
+	gold += value
+	var card_id := int(data.get("id", -1))
+	_remove_card_from_collections(card_id)
+	selected_card.queue_free()
+	selected_card = null
+	_update_gold_ui()
+	_update_shop_buttons()
+	_update_active_stats()
+
+
+func _send_card_data_to_discard(data: Dictionary) -> void:
+	if data.is_empty():
+		return
+	var copy: Dictionary = data.duplicate(true)
+	copy["hp"] = int(copy.get("hp_max", copy.get("def", 1)))
+	player_discard.append(copy)
+
+
+func _discard_board_and_hand() -> void:
+	for slot in active_slots.get_children():
+		if not (slot is Control):
+			continue
+		var content: Node = slot.get_node_or_null("Content")
+		if content and content.get_child_count() > 0:
+			var card := content.get_child(0)
+			if card is Node and ("card_data" in card):
+				_send_card_data_to_discard(card.card_data)
+			card.queue_free()
+	for child in hand_panel.get_children():
+		if child is Node and ("card_data" in child):
+			_send_card_data_to_discard(child.card_data)
+		child.queue_free()
+	selected_card = null
+	_update_active_stats()
+
+
+func _start_player_turn(is_new_fight: bool) -> void:
 	_close_shop_overlay(false)
 	shop_pending = false
-	purchases_this_turn = 0
+	shop_open = false
 	discard_gold_claimed = false
-	if turn_number == 1:
-		player_hp = 100
-		enemy_hp = 100
-	if turn_number == 1:
+	if turn_number == 1 and current_fight_index == 1 and is_new_fight:
 		gold = 3
 	else:
 		var income_bonus: int = int(gold / 5.0)
 		gold = gold + 2 + income_bonus
 	_reset_energy_for_turn()
-	_enemy_prepare_turn()
-	if not shop_locked:
-		_generate_shop_offer(true)
 	_update_active_stats()
 	_update_enemy_stats()
 	_update_hp_ui()
 	_update_gold_ui()
 	_update_shop_buttons()
+	_update_shop_toggle_label()
 	phase = Phase.PLAYER
 	_set_controls_enabled(true)
 
@@ -479,13 +507,48 @@ func _hide_game_over() -> void:
 func _reset_game() -> void:
 	_hide_game_over()
 	selected_card = null
-	_clear_all_cards()
+	_start_run()
+
+
+func _start_run() -> void:
+	current_fight_index = 1
 	turn_number = 1
-	_build_enemy_deck()
-	_start_turn()
-	_populate_hand()
-	_update_active_stats()
+	player_hp = 100
+	enemy_hp = 100
+	gold = 3
+	shop_pending = false
+	shop_open = false
+	shop_locked = false
+	shop_minimized = false
 	_close_shop_overlay(true)
+	_build_player_deck()
+	_prepare_fight()
+
+
+func _build_player_deck() -> void:
+	player_deck.clear()
+	player_draw_pile.clear()
+	player_discard.clear()
+	next_card_id = 1
+	if card_db and card_db.has_method("get_random_card_weighted"):
+		for i in range(10):
+			var data := _normalize_card_for_deck(card_db.get_random_card_weighted())
+			player_deck.append(data)
+	elif card_db:
+		for i in range(10):
+			var data2 := _normalize_card_for_deck(card_db.get_random_card())
+			player_deck.append(data2)
+
+
+func _normalize_card_for_deck(data: Dictionary) -> Dictionary:
+	var d := _with_combat_stats(data)
+	if not d.has("id"):
+		d["id"] = next_card_id
+		next_card_id += 1
+	else:
+		next_card_id = max(next_card_id, int(d["id"]) + 1)
+	d["hp"] = int(d.get("hp_max", d.get("def", 1)))
+	return d
 
 
 func _clear_all_cards() -> void:
@@ -508,6 +571,103 @@ func _clear_all_cards() -> void:
 	for child in hand_panel.get_children():
 		child.queue_free()
 	_clear_shop_offer()
+
+
+func _clear_enemy_board() -> void:
+	for slot in enemy_slots.get_children():
+		if not (slot is Control):
+			continue
+		var content: Node = slot.get_node_or_null("Content")
+		if content:
+			for child in content.get_children():
+				child.queue_free()
+	enemy_hand.clear()
+	enemy_deck.clear()
+
+
+func _prepare_fight() -> void:
+	_clear_all_cards()
+	_build_enemy_deck()
+	enemy_hp = 100
+	turn_number = 1
+	selected_card = null
+	shop_pending = false
+	shop_open = false
+	shop_minimized = false
+	shop_locked = false
+	_close_shop_overlay(true)
+	_refresh_draw_pile_for_fight()
+	_draw_starting_hand()
+	_update_active_stats()
+	_update_enemy_stats()
+	_update_hp_ui()
+	phase = Phase.PLAYER
+	_start_player_turn(true)
+
+
+func _refresh_draw_pile_for_fight() -> void:
+	player_draw_pile.clear()
+	player_discard.clear()
+	for card_data in player_deck:
+		if not (card_data is Dictionary):
+			continue
+		var copy: Dictionary = card_data.duplicate(true)
+		copy["hp"] = int(copy.get("hp_max", copy.get("def", 1)))
+		player_draw_pile.append(copy)
+	player_draw_pile.shuffle()
+
+
+func _draw_starting_hand() -> void:
+	for child in hand_panel.get_children():
+		child.queue_free()
+	_draw_cards_to_hand(5)
+
+
+func _draw_cards_to_hand(count: int) -> void:
+	for i in range(count):
+		if player_draw_pile.is_empty():
+			return
+		var card_data: Dictionary = player_draw_pile.pop_back()
+		_spawn_card_to_hand(card_data)
+
+
+func _spawn_card_to_hand(card_data: Dictionary) -> void:
+	if card_data.is_empty():
+		return
+	var card_instance = card_scene.instantiate()
+	hand_panel.add_child(card_instance) # add first so @onready vars exist
+	if card_instance.has_method("set_card_data"):
+		card_instance.set_card_data(card_data)
+	if card_instance.has_signal("clicked"):
+		card_instance.clicked.connect(_on_card_clicked)
+
+
+func _populate_shop_hand_snapshot() -> void:
+	for child in hand_panel.get_children():
+		child.queue_free()
+	var limit: int = player_deck.size()
+	for i in range(limit):
+		var deck_card: Dictionary = player_deck[i]
+		if not (deck_card is Dictionary):
+			continue
+		var copy: Dictionary = deck_card.duplicate(true)
+		copy["hp"] = int(copy.get("hp_max", copy.get("def", 1)))
+		var card_instance = card_scene.instantiate()
+		hand_panel.add_child(card_instance)
+		if card_instance.has_method("set_card_data"):
+			card_instance.set_card_data(copy)
+		if card_instance.has_signal("clicked"):
+			card_instance.clicked.connect(_on_card_clicked)
+
+
+func _remove_card_from_collections(card_id: int) -> void:
+	if card_id < 0:
+		return
+	for arr in [player_deck, player_draw_pile, player_discard]:
+		for i in range(arr.size()):
+			if int(arr[i].get("id", -1)) == card_id:
+				arr.remove_at(i)
+				break
 
 
 func _with_combat_stats(data: Dictionary) -> Dictionary:
@@ -563,16 +723,21 @@ func _price_for_stars(stars: int) -> int:
 func _open_shop_overlay() -> void:
 	if not shop_pending:
 		return
+	phase = Phase.SHOP
 	shop_open = true
 	shop_minimized = false
 	_set_controls_enabled(false)
+	if discard_button:
+		discard_button.disabled = false
+	_populate_shop_hand_snapshot()
 	# Respect lock: only clear when unlocked and empty
 	if not shop_locked and shop_offer_container.get_child_count() == 0:
 		_clear_shop_offer()
 	shop_overlay.visible = true
 	shop_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if shop_instruction_label:
-		shop_instruction_label.text = "Select one card (cost shown below)"
+		var next_fight := min(current_fight_index + 1, max_fights)
+		shop_instruction_label.text = "Between fights (next: %d/%d) — buy adds to deck, sell from hand for value-1" % [next_fight, max_fights]
 	if shop_offer_container.get_child_count() == 0:
 		_generate_shop_offer()
 	_update_gold_ui()
@@ -630,9 +795,7 @@ func _generate_shop_offer(clear_first: bool = false) -> void:
 func _on_shop_skip_pressed() -> void:
 	if not shop_pending:
 		return
-	_close_shop_overlay(true)
-	phase = Phase.PLAYER
-	_start_turn()
+	_advance_to_next_fight()
 
 
 func _on_shop_toggle_pressed() -> void:
@@ -656,11 +819,7 @@ func _toggle_shop_visibility() -> void:
 func _try_buy_card(card: Node) -> void:
 	if not shop_pending:
 		return
-	if purchases_this_turn >= 1:
-		return
 	if card == null or not _is_in_shop_offer(card):
-		return
-	if hand_panel.get_child_count() >= 5:
 		return
 	var price: int = _price_for_stars(int(card.card_data.get("stars", 1)) if "card_data" in card else 1)
 	if price > gold:
@@ -668,26 +827,28 @@ func _try_buy_card(card: Node) -> void:
 		return
 
 	gold -= price
-	purchases_this_turn += 1
 	var parent := card.get_parent()
 	if parent:
 		parent.remove_child(card)
-	hand_panel.add_child(card)
-	_reset_card_transform(card)
+	var data: Dictionary = card.card_data if "card_data" in card else {}
+	if not data.is_empty():
+		player_deck.append(_normalize_card_for_deck(data))
 	_update_gold_ui()
-	_update_active_stats()
-	_close_shop_overlay(true)
-	shop_locked = false
-	phase = Phase.PLAYER
-	_start_turn()
+	_update_shop_buttons()
+	_populate_shop_hand_snapshot()
+	card.queue_free()
 
 
 func _on_shop_lock_pressed() -> void:
+	if not shop_pending:
+		return
 	shop_locked = not shop_locked
 	_update_shop_buttons()
 
 
 func _on_shop_reroll_pressed() -> void:
+	if not shop_pending:
+		return
 	if gold < 1:
 		return
 	shop_locked = false
@@ -716,6 +877,36 @@ func _update_shop_buttons() -> void:
 		shop_reroll_button.text = "Reroll (-1 gold)"
 
 
+func _advance_to_next_fight() -> void:
+	_close_shop_overlay(true)
+	shop_pending = false
+	shop_open = false
+	shop_locked = false
+	shop_minimized = false
+	if current_fight_index >= max_fights:
+		phase = Phase.GAME_OVER
+		shop_pending = false
+		_show_game_over(true)
+		return
+	current_fight_index += 1
+	_prepare_fight()
+
+
+func _end_fight_victory() -> void:
+	_discard_board_and_hand()
+	_clear_enemy_board()
+	_update_active_stats()
+	_update_enemy_stats()
+	if current_fight_index >= max_fights:
+		phase = Phase.GAME_OVER
+		shop_pending = false
+		_show_game_over(true)
+		return
+	shop_pending = true
+	phase = Phase.SHOP
+	_open_shop_overlay()
+
+
 func _get_board_star_total() -> int:
 	var total := 0
 	for slot in active_slots.get_children():
@@ -739,11 +930,16 @@ func _get_star_cap() -> int:
 
 func _set_controls_enabled(enabled: bool) -> void:
 	if end_turn_button:
-		end_turn_button.disabled = not enabled
+		end_turn_button.disabled = not enabled or phase != Phase.PLAYER
 	if discard_button:
-		discard_button.disabled = not enabled
+		if phase == Phase.SHOP:
+			discard_button.disabled = false
+			discard_button.text = "Sell Selected"
+		else:
+			discard_button.disabled = not enabled
+			discard_button.text = "Discard Selected"
 	if shop_toggle_button:
-		shop_toggle_button.disabled = not enabled or not shop_pending
+		shop_toggle_button.disabled = not shop_pending
 
 
 func _get_lane_card(container: HBoxContainer, index: int) -> Node:
@@ -769,6 +965,8 @@ func _apply_damage_to_card(card: Node, damage: int) -> void:
 	if card.has_method("update_hp"):
 		card.update_hp(current_hp)
 	if current_hp <= 0:
+		if not _is_enemy_card_node(card):
+			_send_card_data_to_discard(card.card_data)
 		card.queue_free()
 
 
@@ -839,18 +1037,18 @@ func _run_combat_phase() -> void:
 	_update_hp_ui()
 
 	if player_hp <= 0:
+		_discard_board_and_hand()
+		_clear_enemy_board()
 		phase = Phase.GAME_OVER
 		_show_game_over(false)
 		return
 	if enemy_hp <= 0:
-		phase = Phase.GAME_OVER
-		_show_game_over(true)
+		_end_fight_victory()
 		return
 
 	turn_number += 1
-	shop_pending = true
-	phase = Phase.SHOP
-	_open_shop_overlay()
+	phase = Phase.PLAYER
+	_start_player_turn(false)
 
 
 func _resolve_combat_lane(index: int) -> void:
