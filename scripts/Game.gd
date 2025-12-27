@@ -63,6 +63,7 @@ var enemy_max_energy: int = 1
 var enemy_current_energy: int = 1
 enum Phase { SHOP, PLAYER, ENEMY, COMBAT, GAME_OVER }
 var phase: Phase = Phase.PLAYER
+var deck_overlay_selected_id: int = -1
 
 
 func _ready() -> void:
@@ -409,6 +410,17 @@ func _on_discard_pressed() -> void:
 
 
 func _sell_selected_card() -> void:
+	# Allow selling directly from deck overlay during shop
+	if phase == Phase.SHOP and deck_overlay_selected_id != -1 and shop_pending:
+		var card_id := deck_overlay_selected_id
+		var value_overlay: int = max(0, _price_for_stars(_get_card_stars(card_id)) - 1)
+		gold += value_overlay
+		_sell_deck_card_by_id(card_id)
+		deck_overlay_selected_id = -1
+		_refresh_deck_overlay()
+		_update_gold_ui()
+		return
+
 	if selected_card == null:
 		return
 	if selected_card.get_parent() != hand_panel:
@@ -676,35 +688,47 @@ func _remove_card_from_collections(card_id: int) -> void:
 
 func _refresh_deck_overlay() -> void:
 	if deck_count_label:
-		deck_count_label.text = "Cards: %d" % player_draw_pile.size()
+		deck_count_label.text = "Cards: %d" % player_deck.size()
 	if shop_deck_count_label:
-		shop_deck_count_label.text = "Cards: %d" % player_draw_pile.size()
-	if not deck_list:
-		return
-	for child in deck_list.get_children():
-		child.queue_free()
-	for card_data in player_draw_pile:
+		shop_deck_count_label.text = "Cards: %d" % player_deck.size()
+	if deck_list:
+		for child in deck_list.get_children():
+			child.queue_free()
+	var shuffled: Array = player_deck.duplicate(true)
+	shuffled.shuffle()
+	for card_data in shuffled:
 		if not (card_data is Dictionary):
 			continue
 		var card_name := str(card_data.get("name", "Card"))
 		var stars := int(card_data.get("stars", 1))
 		var atk := int(card_data.get("atk", card_data.get("off", 0)))
 		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
-		var entry := Label.new()
+		var entry := Button.new()
 		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, card_name, atk, hp]
-		deck_list.add_child(entry)
+		entry.toggle_mode = true
+		entry.set_meta("card_id", int(card_data.get("id", -1)))
+		entry.pressed.connect(func(): _on_deck_entry_selected(int(card_data.get("id", -1))))
+		if int(card_data.get("id", -1)) == deck_overlay_selected_id:
+			entry.button_pressed = true
+		if deck_list:
+			deck_list.add_child(entry)
 	if shop_deck_list:
 		for child in shop_deck_list.get_children():
 			child.queue_free()
-		for card_data in player_draw_pile:
+		for card_data in shuffled:
 			if not (card_data is Dictionary):
 				continue
 			var card_name2 := str(card_data.get("name", "Card"))
 			var stars2 := int(card_data.get("stars", 1))
 			var atk2 := int(card_data.get("atk", card_data.get("off", 0)))
 			var hp2 := int(card_data.get("hp_max", card_data.get("def", 0)))
-			var entry2 := Label.new()
+			var entry2 := Button.new()
 			entry2.text = "⭐%d  %s  ATK %d / HP %d" % [stars2, card_name2, atk2, hp2]
+			entry2.toggle_mode = true
+			entry2.set_meta("card_id", int(card_data.get("id", -1)))
+			entry2.pressed.connect(func(): _on_deck_entry_selected(int(card_data.get("id", -1))))
+			if int(card_data.get("id", -1)) == deck_overlay_selected_id:
+				entry2.button_pressed = true
 			shop_deck_list.add_child(entry2)
 
 
@@ -713,6 +737,28 @@ func _on_deck_toggle_pressed() -> void:
 		return
 	deck_overlay.visible = not deck_overlay.visible
 	_refresh_deck_overlay()
+
+
+func _on_deck_entry_selected(card_id: int) -> void:
+	deck_overlay_selected_id = card_id
+	_refresh_deck_overlay()
+
+
+func _sell_deck_card_by_id(card_id: int) -> void:
+	if card_id < 0:
+		return
+	_remove_card_from_collections(card_id)
+	_update_gold_ui()
+	_update_shop_buttons()
+	_update_active_stats()
+
+
+func _get_card_stars(card_id: int) -> int:
+	for arr in [player_deck, player_draw_pile, player_discard]:
+		for c in arr:
+			if int(c.get("id", -1)) == card_id:
+				return int(c.get("stars", 1))
+	return 1
 
 
 func _with_combat_stats(data: Dictionary) -> Dictionary:
