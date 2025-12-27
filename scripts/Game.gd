@@ -736,7 +736,7 @@ func _open_shop_overlay() -> void:
 	shop_overlay.visible = true
 	shop_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if shop_instruction_label:
-		var next_fight := min(current_fight_index + 1, max_fights)
+		var next_fight: int = min(current_fight_index + 1, max_fights)
 		shop_instruction_label.text = "Between fights (next: %d/%d) — buy adds to deck, sell from hand for value-1" % [next_fight, max_fights]
 	if shop_offer_container.get_child_count() == 0:
 		_generate_shop_offer()
