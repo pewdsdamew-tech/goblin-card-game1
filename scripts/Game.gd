@@ -699,37 +699,31 @@ func _refresh_deck_overlay() -> void:
 	for card_data in shuffled:
 		if not (card_data is Dictionary):
 			continue
-		var card_name := str(card_data.get("name", "Card"))
-		var stars := int(card_data.get("stars", 1))
-		var atk := int(card_data.get("atk", card_data.get("off", 0)))
-		var hp := int(card_data.get("hp_max", card_data.get("def", 0)))
-		var entry := Button.new()
-		entry.text = "⭐%d  %s  ATK %d / HP %d" % [stars, card_name, atk, hp]
-		entry.toggle_mode = true
-		entry.set_meta("card_id", int(card_data.get("id", -1)))
-		entry.pressed.connect(func(): _on_deck_entry_selected(int(card_data.get("id", -1))))
-		if int(card_data.get("id", -1)) == deck_overlay_selected_id:
-			entry.button_pressed = true
+		var card_instance = card_scene.instantiate()
+		if card_instance.has_method("set_card_data"):
+			card_instance.set_card_data(card_data)
+		card_instance.mouse_filter = Control.MOUSE_FILTER_STOP
+		card_instance.gui_input.connect(func(event):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				_on_deck_card_sprite_selected(int(card_data.get("id", -1)))
+		)
 		if deck_list:
-			deck_list.add_child(entry)
+			deck_list.add_child(card_instance)
 	if shop_deck_list:
 		for child in shop_deck_list.get_children():
 			child.queue_free()
 		for card_data in shuffled:
 			if not (card_data is Dictionary):
 				continue
-			var card_name2 := str(card_data.get("name", "Card"))
-			var stars2 := int(card_data.get("stars", 1))
-			var atk2 := int(card_data.get("atk", card_data.get("off", 0)))
-			var hp2 := int(card_data.get("hp_max", card_data.get("def", 0)))
-			var entry2 := Button.new()
-			entry2.text = "⭐%d  %s  ATK %d / HP %d" % [stars2, card_name2, atk2, hp2]
-			entry2.toggle_mode = true
-			entry2.set_meta("card_id", int(card_data.get("id", -1)))
-			entry2.pressed.connect(func(): _on_deck_entry_selected(int(card_data.get("id", -1))))
-			if int(card_data.get("id", -1)) == deck_overlay_selected_id:
-				entry2.button_pressed = true
-			shop_deck_list.add_child(entry2)
+			var card_instance2 = card_scene.instantiate()
+			if card_instance2.has_method("set_card_data"):
+				card_instance2.set_card_data(card_data)
+			card_instance2.mouse_filter = Control.MOUSE_FILTER_STOP
+			card_instance2.gui_input.connect(func(event):
+				if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+					_on_deck_card_sprite_selected(int(card_data.get("id", -1)))
+			)
+			shop_deck_list.add_child(card_instance2)
 
 
 func _on_deck_toggle_pressed() -> void:
@@ -740,6 +734,13 @@ func _on_deck_toggle_pressed() -> void:
 
 
 func _on_deck_entry_selected(card_id: int) -> void:
+	deck_overlay_selected_id = card_id
+	_refresh_deck_overlay()
+
+
+func _on_deck_card_sprite_selected(card_id: int) -> void:
+	if phase != Phase.SHOP or not shop_pending:
+		return
 	deck_overlay_selected_id = card_id
 	_refresh_deck_overlay()
 
