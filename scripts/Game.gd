@@ -21,7 +21,7 @@ extends Control
 @onready var shop_skip_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SkipButton
 @onready var shop_lock_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopLockButton
 @onready var shop_reroll_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/ShopRerollButton
-@onready var shop_deck_count_label: Label = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckCountLabel
+@onready var shop_deck_count_label: Label = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckHeader/DeckCountLabel
 @onready var shop_deck_list: VBoxContainer = $ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckScroll/DeckList
 @onready var shop_sell_button: Button = $ShopOverlay/Panel/VBoxContainer/ShopButtons/SellButton
 @onready var deck_button: Button = $Stats/VBoxContainer/Buttons/DeckButton
@@ -700,15 +700,15 @@ func _refresh_deck_overlay() -> void:
 		if not (card_data is Dictionary):
 			continue
 		var card_instance = card_scene.instantiate()
-		if card_instance.has_method("set_card_data"):
-			card_instance.set_card_data(card_data)
 		card_instance.mouse_filter = Control.MOUSE_FILTER_STOP
+		if deck_list:
+			deck_list.add_child(card_instance)
+		if card_instance.has_method("set_card_data"):
+			card_instance.call_deferred("set_card_data", card_data)
 		card_instance.gui_input.connect(func(event):
 			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 				_on_deck_card_sprite_selected(int(card_data.get("id", -1)))
 		)
-		if deck_list:
-			deck_list.add_child(card_instance)
 	if shop_deck_list:
 		for child in shop_deck_list.get_children():
 			child.queue_free()
@@ -716,14 +716,14 @@ func _refresh_deck_overlay() -> void:
 			if not (card_data is Dictionary):
 				continue
 			var card_instance2 = card_scene.instantiate()
-			if card_instance2.has_method("set_card_data"):
-				card_instance2.set_card_data(card_data)
 			card_instance2.mouse_filter = Control.MOUSE_FILTER_STOP
+			shop_deck_list.add_child(card_instance2)
+			if card_instance2.has_method("set_card_data"):
+				card_instance2.call_deferred("set_card_data", card_data)
 			card_instance2.gui_input.connect(func(event):
 				if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 					_on_deck_card_sprite_selected(int(card_data.get("id", -1)))
 			)
-			shop_deck_list.add_child(card_instance2)
 
 
 func _on_deck_toggle_pressed() -> void:
