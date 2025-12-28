@@ -39,6 +39,22 @@ text = "Energy: 1 / 1"
 layout_mode = 2
 text = "OFF: 0   DEF: 0   STARS: 0"
 
+[node name="PlayerHpLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "HP: 100"
+
+[node name="EnemyHpLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Enemy HP: 100"
+
+[node name="GoldLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Gold: 3"
+
+[node name="EnemyStatsLabel" type="Label" parent="Stats/VBoxContainer"]
+layout_mode = 2
+text = "Enemy OFF: 0   DEF: 0   STARS: 0"
+
 [node name="Buttons" type="HBoxContainer" parent="Stats/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -51,23 +67,33 @@ text = "End Turn"
 layout_mode = 2
 text = "Discard Selected"
 
+[node name="ShopToggleButton" type="Button" parent="Stats/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "Open Shop"
+
+[node name="DeckButton" type="Button" parent="Stats/VBoxContainer/Buttons"]
+layout_mode = 2
+text = "View Deck"
+
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
+mouse_filter = 2
 
 [node name="Spacer" type="Control" parent="VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+mouse_filter = 2
 
 [node name="BottomUI" type="Control" parent="."]
 custom_minimum_size = Vector2(0, 420)
 layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
+anchors_preset = 15
+anchor_top = 0.28
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -80,6 +106,50 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="EnemySlots" type="HBoxContainer" parent="BottomUI/UIStack"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="EnemySlot1" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot1"]
+layout_mode = 2
+
+[node name="EnemySlot2" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot2"]
+layout_mode = 2
+
+[node name="EnemySlot3" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot3"]
+layout_mode = 2
+
+[node name="EnemySlot4" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot4"]
+layout_mode = 2
+
+[node name="EnemySlot5" type="PanelContainer" parent="BottomUI/UIStack/EnemySlots"]
+custom_minimum_size = Vector2(140, 160)
+layout_mode = 2
+
+[node name="Content" type="CenterContainer" parent="BottomUI/UIStack/EnemySlots/EnemySlot5"]
+layout_mode = 2
 
 [node name="ActiveSlots" type="HBoxContainer" parent="BottomUI/UIStack"]
 custom_minimum_size = Vector2(0, 240)
@@ -129,3 +199,191 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = -5
 alignment = 1
+
+[node name="GameOverOverlay" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+visible = false
+
+[node name="Panel" type="PanelContainer" parent="GameOverOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -140.0
+offset_right = 220.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameOverOverlay/Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -120.0
+offset_right = 200.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="MessageLabel" type="Label" parent="GameOverOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Game Over"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RestartButton" type="Button" parent="GameOverOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Restart"
+size_flags_horizontal = 4
+
+[node name="ShopOverlay" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+visible = false
+z_index = 90
+
+[node name="Panel" type="PanelContainer" parent="ShopOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -180.0
+offset_right = 260.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ShopOverlay/Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -160.0
+offset_right = 240.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="InstructionLabel" type="Label" parent="ShopOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Select one card"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Offers" type="HBoxContainer" parent="ShopOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="DeckPanel" type="VBoxContainer" parent="ShopOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="DeckHeader" type="HBoxContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="DeckTitle" type="Label" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckHeader"]
+layout_mode = 2
+text = "Your Deck (draw pile)"
+
+[node name="DeckCountLabel" type="Label" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckHeader"]
+layout_mode = 2
+text = "Cards: 0"
+
+[node name="DeckScroll" type="ScrollContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DeckList" type="VBoxContainer" parent="ShopOverlay/Panel/VBoxContainer/DeckPanel/DeckScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="ShopButtons" type="HBoxContainer" parent="ShopOverlay/Panel/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="ShopLockButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
+layout_mode = 2
+text = "Lock Shop"
+
+[node name="ShopRerollButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
+layout_mode = 2
+text = "Reroll (-1 gold)"
+
+[node name="SellButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
+layout_mode = 2
+text = "Sell Selected"
+
+[node name="SkipButton" type="Button" parent="ShopOverlay/Panel/VBoxContainer/ShopButtons"]
+layout_mode = 2
+text = "Skip"
+size_flags_horizontal = 4
+
+[node name="DeckOverlay" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 16.0
+offset_top = 420.0
+offset_right = 316.0
+offset_bottom = 760.0
+mouse_filter = 1
+z_index = 95
+
+[node name="DeckVBox" type="VBoxContainer" parent="DeckOverlay"]
+layout_mode = 2
+theme_override_constants/separation = 6
+mouse_filter = 1
+
+[node name="DeckTitle" type="Label" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+text = "Draw Pile"
+
+[node name="DeckCountLabel" type="Label" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+text = "Cards: 0"
+
+[node name="DeckScroll" type="ScrollContainer" parent="DeckOverlay/DeckVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 1
+
+[node name="DeckList" type="VBoxContainer" parent="DeckOverlay/DeckVBox/DeckScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+mouse_filter = 1
